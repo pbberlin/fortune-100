@@ -1,0 +1,17 @@
+stock-market
+stock-market-new
+
+~*
+*.exe
+*.exe~
+*.gzip
+
+*.sqlite
+
+# static resources
+**/out/**
+
+# app-bucket/**
+tmp/*
+tmp*
+
