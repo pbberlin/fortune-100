@@ -9,6 +9,7 @@ stock-market-new
 *.sqlite
 
 # static resources
+**/raw/**
 **/out/**
 
 # app-bucket/**
