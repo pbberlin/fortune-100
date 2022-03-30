@@ -11,7 +11,6 @@ func main() {
 	bezier()
 	animGIF1()
 	animGIF2()
-	stockMarket1()
 	stockMarket2()
 
 }

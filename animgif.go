@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/color/palette"
+	"image/draw"
 	"image/gif"
 	"log"
 	"math"
 	"os"
 
+	"github.com/fogleman/gg"
 	"github.com/pbberlin/dbg"
 )
 
@@ -24,8 +27,6 @@ import (
 }
 */
 func makePalette(sz int) []color.Color {
-
-	log.Printf("(counting from 0)")
 
 	bs := uint8(0xff)
 	pal := make([]color.Color, 0, sz)
@@ -45,16 +46,13 @@ func makePalette(sz int) []color.Color {
 		for cci := 0; cci < 3; cci++ { // color component index - ci
 			v := byte(ci)
 			if (v>>cci)&1 == 1 {
-				// log.Printf("  bit %v of %v is  set", cci, v)
-
 				rgb[cci] = uint8(0xff) - uint8(shade*numShades)
 
 			} else {
-				// log.Printf("  bit %v of %v not set", cci, v)
 				rgb[cci] = uint8(0x00)
 			}
 			if ci%2 == 0 && (ci < 8 || ci > 251 || ci%40 == 0) {
-				log.Printf("color %3v:  bit %v to %3v", ci, cci, rgb[cci])
+				// log.Printf("color %3v:  bit %v to %3v", ci, cci, rgb[cci])
 			}
 		}
 
@@ -65,6 +63,27 @@ func makePalette(sz int) []color.Color {
 	_ = dbg.Dump2String(pal)
 
 	return pal
+
+}
+
+func renderIntoPalettedImage(c *gg.Context) *image.Paletted {
+
+	src := c.Image()
+	var dst *image.Paletted
+	dst = image.NewPaletted(src.Bounds(), makePalette(256))
+	// dst = image.NewPaletted(src.Bounds(), palette.WebSafe)
+	dst = image.NewPaletted(src.Bounds(), palette.Plan9)
+
+	if false {
+		// Floyd-Steinberg makes artifacts but Image with good colors and doesn't have gradient issue. Only issue with dots.
+		drawer := draw.FloydSteinberg
+		drawer.Draw(dst, dst.Bounds(), src, image.Point{0, 0})
+	} else {
+		// file size seven times smaller than FloydSteinberg
+		// little quality loss
+		draw.Draw(dst, dst.Bounds(), src, image.Point{0, 0}, draw.Over)
+	}
+	return dst
 
 }
 
