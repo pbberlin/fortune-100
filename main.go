@@ -8,7 +8,8 @@ func main() {
 
 	log.SetFlags(log.Lshortfile)
 
-	prepareData()
+	// prepareData()
+	restruct()
 
 	bezier()
 	animGIF1()
