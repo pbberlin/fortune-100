@@ -8,7 +8,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func stockMarket2() {
+func stockMarket2(rankings []Ranking, companies []company, companiesByName map[string]company) {
 
 	var images []*image.Paletted
 	var delays []int

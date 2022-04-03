@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,12 @@ type Ranking struct {
 	Rank    int
 	Name    string
 	Revenue int
+}
+
+// company is a helper struct
+type company struct {
+	Name  string
+	Color color.RGBA
 }
 
 func prepareData() {
@@ -103,12 +110,7 @@ func prepareData() {
 
 }
 
-type company struct {
-	Name  string
-	Color color.RGBA
-}
-
-func restruct() []Ranking {
+func organize() ([]Ranking, []company, map[string]company) {
 
 	bts, err := os.ReadFile("./out/rankings.json")
 	if err != nil {
@@ -121,16 +123,32 @@ func restruct() []Ranking {
 		log.Fatalf("cannot unmarshal ./out/rankings.json: %v", err)
 	}
 
+	sort.Slice(rankings, func(i, j int) bool {
+		if rankings[i].Year > rankings[j].Year {
+			return false
+		}
+		if rankings[i].Year < rankings[j].Year {
+			return true
+		}
+		// year equality
+		if rankings[i].Rank < rankings[j].Rank {
+			return false
+		}
+		return true
+	})
+
 	dbg.Dump(rankings[:4])
+	dbg.Dump(rankings[98:102])
+	dbg.Dump(rankings[len(rankings)-4:])
 
 	// distinct companies
 	companies := make([]company, 0, 100)
-	distinct := map[string]interface{}{}
+	companiesByName := map[string]company{}
 	for i := 0; i < len(rankings); i++ {
-		if _, ok := distinct[rankings[i].Name]; ok {
+		if _, ok := companiesByName[rankings[i].Name]; ok {
 			companies = append(companies, company{Name: rankings[i].Name})
 		}
-		distinct[rankings[i].Name] = nil
+		companiesByName[rankings[i].Name] = company{Name: rankings[i].Name}
 	}
 	log.Printf("Found %v distinct companies", len(companies))
 
@@ -147,11 +165,15 @@ func restruct() []Ranking {
 	}
 	for i := 0; i < len(companies); i++ {
 		companies[i].Color = cols[(i % len(cols))]
+
+		comp := companiesByName[companies[i].Name]
+		comp.Color = cols[(i % len(cols))]
+		companiesByName[companies[i].Name] = comp
 	}
 
-	dbg.Dump(companies[:4])
-	dbg.Dump(companies[len(companies)-4:])
+	// dbg.Dump(companies[:4])
+	// dbg.Dump(companies[len(companies)-4:])
 
-	return rankings
+	return rankings, companies, companiesByName
 
 }
