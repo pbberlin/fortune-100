@@ -8,12 +8,16 @@ func main() {
 
 	log.SetFlags(log.Lshortfile)
 
-	bezier()
-	animGIF1()
-	animGIF2()
+	if false {
+		bezier()
+		animGIF1()
+		animGIF2()
+	}
 
-	// prepareData()
-	rankings, companies, compantiesByName := organize()
-	stockMarket2(rankings, companies, compantiesByName)
+	// rawList2JSON()
+
+	rankings, rksYears, companies, compantiesByName := organize()
+	_, _ = rankings, companies
+	stockMarket2(rksYears, compantiesByName)
 
 }
