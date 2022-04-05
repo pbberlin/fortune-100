@@ -20,20 +20,43 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 	years := rksYears.Years()
 
 	c := gg.NewContext(int(w), int(h))
-	// if err := c.LoadFontFace("./out/arialbd.ttf", 96); err != nil {
-	if err := c.LoadFontFace("./out/arialbd.ttf", 14); err != nil {
+	fontSize := 96.0
+	fontSize = 14.0
+	fontSize = 12.0
+	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
 		log.Fatalf("Cannot load font: %v", err)
 	}
 	scale100 := float64(w) / float64(100)
-	draw := func(x, y, r float64) {
-		c.DrawCircle(scale100*x, scale100*y, scale100*r)
+
+	// funcs as closures to reduce number of parameters
+	cntr2 := 0
+	draw := func(x, y, rad, revenue, maxRev float64) {
+
+		rd := revenue / maxRev * rad // max rad
+
+		rdScaled := 6 * rd
+		if rdScaled > rad {
+			rdScaled = rad
+		}
+
+		cntr2++
+		if cntr2%13 == 0 {
+			log.Printf("%11v %11v - %5.2v - %5.2v - %5.2v", revenue, maxRev, revenue/maxRev, revenue/maxRev*rad, rdScaled)
+		}
+
+		c.DrawCircle(scale100*x, scale100*y, scale100*rdScaled)
 	}
-	text := func(x, y float64, s string) {
-		c.SetRGB(0.8, 0.8, 0.8)
-		c.DrawString(
+	text := func(x, y, w float64, s string) {
+		c.SetRGB(0.95, 0.95, 0.95)
+		// c.DrawString(s, scale100*x, scale100*y+c.FontHeight())
+		// c.DrawStringAnchored(s, scale100*x, scale100*y, 0.5, 0.5)
+		c.DrawStringWrapped(
 			s,
-			scale100*x,
-			scale100*y+c.FontHeight(),
+			scale100*x, scale100*y,
+			0.5, 0.5,
+			w,
+			1.3,
+			gg.AlignCenter,
 		)
 	}
 
@@ -50,34 +73,37 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 		c.SetRGB(0.8, 0.8, 0.8)
 		c.DrawString(fmt.Sprintf("Yr %v", yr), 5, 5+c.FontHeight())
 
-		row := 0.0
 		cx := 0.0
-		dp := 16.0 // displacement
+		bx := 16.0 // box size - displacement
+		bx = 12.0
+		bx = 9.0
+
+		row := 0.0
 		for i := 0; i < len(rksYears[cntr].Rankings); i++ {
 
 			rv := rksYears[cntr].Rankings[i].Revenue
 			nm := rksYears[cntr].Rankings[i].Name
 
-			_, _ = rv, nm
+			cx += bx
 
-			if cx+dp > 100 {
+			if cx+bx >= 100 {
 				cx = 0
 				row++
-			} else {
-				cx += dp
+				// log.Printf("row %3v", row)
 			}
 
-			x := cx + dp/2
+			x := cx + bx/2
 
-			y := 100 - dp - (row * dp)
-			cl := companiesByName[nm].Color
+			// log.Printf("  cx is %3v - x %3v", cx, x)
+
+			y := 100 - bx - (row * bx)
 			// c.DrawCircle(x, y, 8.0)
-			draw(x, y, dp/2*0.8)
+			draw(x, y, bx/2, rv, rksYears[cntr].Max)
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
-			c.SetColor(cl)
+			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
 
-			text(x, y, companiesByName[nm].Name)
+			text(x, y, bx, nm)
 
 		}
 
@@ -89,11 +115,11 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 
 		images = append(images, renderIntoPalettedImage(c))
 
-		elongation := 10
-		if yr < len(years)/2 {
-			delays = append(delays, yr*elongation)
+		elongation := 50
+		if cntr < len(years)/2 {
+			delays = append(delays, cntr*elongation)
 		} else {
-			delays = append(delays, (len(years)-yr)*elongation)
+			delays = append(delays, (len(years)-cntr)*elongation)
 		}
 
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"image/color"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,11 +16,13 @@ type Ranking struct {
 	Year    int
 	Rank    int
 	Name    string
-	Revenue int
+	Revenue float64
 }
 
 type RankingsYear struct {
 	Year     int
+	Min      float64 // Min revenue from all companies in this year
+	Max      float64 // ...
 	Rankings []Ranking
 }
 
@@ -37,16 +40,63 @@ func (rksyrs RankingsYears) Years() []int {
 	return yrs
 }
 
-// allocate colors
-var cols = []color.RGBA{
+func (rksyrs *RankingsYears) SetMinMax() {
+	for i := 0; i < len(*rksyrs); i++ {
+		(*rksyrs)[i].Min = math.MaxFloat64
+		(*rksyrs)[i].Max = -math.MaxFloat64
+		for j := 0; j < len((*rksyrs)[i].Rankings); j++ {
+			if (*rksyrs)[i].Min > (*rksyrs)[i].Rankings[j].Revenue {
+				(*rksyrs)[i].Min = (*rksyrs)[i].Rankings[j].Revenue
+			}
+			if (*rksyrs)[i].Max < (*rksyrs)[i].Rankings[j].Revenue {
+				(*rksyrs)[i].Max = (*rksyrs)[i].Rankings[j].Revenue
+			}
+		}
+	}
+}
+func (rksyrs RankingsYears) SetMinMax2() {
+	for i := 0; i < len(rksyrs); i++ {
+		rksyrs[i].Min = math.MaxFloat64
+		rksyrs[i].Max = -math.MaxFloat64
+		for j := 0; j < len(rksyrs[i].Rankings); j++ {
+			if rksyrs[i].Min > rksyrs[i].Rankings[j].Revenue {
+				rksyrs[i].Min = rksyrs[i].Rankings[j].Revenue
+			}
+			if rksyrs[i].Max < rksyrs[i].Rankings[j].Revenue {
+				rksyrs[i].Max = rksyrs[i].Rankings[j].Revenue
+			}
+		}
+	}
+}
+
+var circleCols = []color.RGBA{
 	// {0x00, 0x00, 0x00, 0xff}, // not black
-	{0x00, 0x00, 0xff, 0xff},
-	{0x00, 0xff, 0x00, 0xff},
-	{0x00, 0xff, 0xff, 0xff},
-	{0xff, 0x00, 0x00, 0xff},
-	{0xff, 0x00, 0xff, 0xff},
-	{0xff, 0xff, 0x00, 0xff},
-	{0xff, 0xff, 0xff, 0xff},
+
+	{0x00, 0x00, 0x88, 0xff},
+	{0x00, 0x00, 0x44, 0xff},
+
+	{0x00, 0x88, 0x00, 0xff},
+	{0x00, 0x44, 0x00, 0xff},
+
+	{0x00, 0x88, 0x88, 0xff},
+	{0x00, 0x88, 0x44, 0xff},
+	{0x00, 0x44, 0x88, 0xff},
+	{0x00, 0x44, 0x44, 0xff},
+
+	{0x88, 0x00, 0x00, 0xff},
+	{0x44, 0x00, 0x00, 0xff},
+
+	{0x88, 0x00, 0x88, 0xff},
+	{0x88, 0x00, 0x44, 0xff},
+	{0x44, 0x00, 0x88, 0xff},
+	{0x44, 0x00, 0x44, 0xff},
+
+	{0x88, 0x88, 0x00, 0xff},
+	{0x88, 0x44, 0x00, 0xff},
+	{0x44, 0x88, 0x00, 0xff},
+	{0x44, 0x44, 0x00, 0xff},
+
+	// {0xff, 0xff, 0xff, 0xff}, // not white
 }
 
 // company is a helper struct
@@ -56,6 +106,12 @@ type company struct {
 }
 
 var suffixes1 = []string{
+	", ",
+	",",
+	" ",
+}
+
+var suffixes2 = []string{
 	"& company",
 	"company",
 	"companies",
@@ -63,92 +119,145 @@ var suffixes1 = []string{
 	"corporation",
 	"corp",
 	"corp.",
+	"incorporated",
 	"& inc.",
 	"inc.",
 	"and co.",
 	"& co.",
 	"co.",
+	"international",
 	"group",
 	"insurance",
+	"holding",
 	"holdings",
 }
 
-var suffixes2 = []string{
-	", ",
-	",",
-	" ",
-}
-
 func cleanseName(s string) string {
+
 	sl := strings.ToLower(s)
 	// log.Printf("Name cleanse %v", sl)
+
 	if strings.HasPrefix(sl, "the ") {
-		log.Printf("  cleanse %q from %q", "the ", s)
 		s = s[4:]
 	}
-	for _, sfx1 := range suffixes1 {
-		for _, sfx2 := range suffixes2 {
+	if strings.HasPrefix(sl, "minnesota mining") {
+		s = "Minnesota Mining"
+	}
+	for _, sfx1 := range suffixes2 {
+		for _, sfx2 := range suffixes1 {
 			sfx := sfx2 + sfx1
 			sl := strings.ToLower(s)
 			if strings.HasSuffix(sl, sfx) {
-				log.Printf("  cleanse %q from %q", sfx, s)
+				// log.Printf("  cleanse %q from %q", sfx, s)
 				s = s[:len(s)-len(sfx)]
 			}
 		}
-
 	}
 
 	return s
 }
 
-var reps = map[string]string{
-	"Morgan Stanley Dean Witter":       "Morgan Stanley",
-	"MCI WorldCom":                     "MCI",
-	"MCI Communications":               "MCI",
-	"Express Scripts Holding":          "Express Scripts",
-	"Aetna Life & Casualty":            "Aetna",
-	"International Business Machines":  "IBM",
-	"Hewlett-Packard":                  "HP",
-	"Walgreens Boots Alliance":         "Walgreen",
-	"Walgreens":                        "Walgreen",
-	"ConocoPhillips":                   "Conoco",
-	"HCA Inc":                          "HCA",
-	"HCA Healthcare":                   "HCA",
-	"Columbia/HCA Healthcare":          "HCA",
-	"CVS Health":                       "CVS",
-	"CVS Caremark":                     "CVS",
-	"Travelers Cos.":                   "Travelers",
-	"Costco Wholesale":                 "Costco",
-	"Sprint Nextel":                    "Sprint",
-	"Price/Costco":                     "Costco",
-	"State Farm Insurance Cos.":        "State Farm",
-	"Amazon.com":                       "Amazon",
-	"Dell Technologies":                "Dell",
-	"Dell Computer":                    "Dell",
-	"United Parcel Service of America": "United Parcel Service",
-	"McKesson HBOC":                    "McKesson",
-	"Prudential Financial (U.S.)":      "Prudential Financial",
-	"Verizon Communications":           "Verizon",
-	"Philip Morris International":      "Philip Morris",
-	"Raytheon Technologies":            "Raytheon",
-	"Dow Chemical":                     "Dow",
-	"UnitedHealth Group Incorporated":  "UnitedHealth",
-	"UnitedHealth Group, Incorporated": "UnitedHealth",
-	"St. Paul Travelers":               "Travelers",
-	"Nationwide Mutual":                "Nationwide",
-	"Liberty Mutual Holding":           "Liberty Mutual",
-	"Sears, Roebuck and":               "Sears",
-	"Sears, Roebuck":                   "Sears",
-	"J.P. Morgan Chase":                "J.P. Morgan",
-	"J.P. Morgan & Co. Incorporated":   "J.P. Morgan",
-	"E.I. du Pont de Nemours and":      "E.I. du Pont de Nemours",
-	"TIAA-CREF":                        "TIAA",
-	"Energy Transfer Equity":           "Energy Transfer",
+var replacements = map[string]string{
+	"American International Group,Inc.": "AIG",
+	"American International Group":      "AIG",
+	"Enterprise GP Holdings, L.P.":      "Enterpr GP Hd",
+	"International Assets":              "Intl Assets",
+	"International Assets Holding":      "Intl Assets",
+
+	"Marathon Petroleum":                      "Marathon Petrol.",
+	"Phillips Petroleum":                      "Phillips Petrol.",
+	"Metropolitan Life":                       "Metropol. Life",
+	"Morgan Stanley Dean Witter":              "Morgan Stanley",
+	"MCI WorldCom":                            "MCI",
+	"MCI Communications":                      "MCI",
+	"Express Scripts Holding":                 "Express Scripts",
+	"Aetna Life & Casualty":                   "Aetna",
+	"International Business Machines":         "IBM",
+	"Hewlett-Packard":                         "HP",
+	"Walgreens Boots Alliance":                "Walgreen",
+	"Walgreens":                               "Walgreen",
+	"ConocoPhillips":                          "Conoco",
+	"HCA Inc":                                 "HCA",
+	"HCA Healthcare":                          "HCA",
+	"Columbia/HCA Healthcare":                 "HCA",
+	"CVS Health":                              "CVS",
+	"CVS Caremark":                            "CVS",
+	"Travelers Cos.":                          "Travelers",
+	"Costco Wholesale":                        "Costco",
+	"Sprint Nextel":                           "Sprint",
+	"Price/Costco":                            "Costco",
+	"State Farm Insurance Cos.":               "State Farm",
+	"Amazon.com":                              "Amazon",
+	"Dell Technologies":                       "Dell",
+	"Dell Computer":                           "Dell",
+	"McKesson HBOC":                           "McKesson",
+	"Verizon Communications":                  "Verizon",
+	"Philip Morris International":             "Philip Morris",
+	"Raytheon Technologies":                   "Raytheon",
+	"Dow Chemical":                            "Dow",
+	"UnitedHealth Group Incorporated":         "UnitedHealth",
+	"UnitedHealth Group, Incorporated":        "UnitedHealth",
+	"St. Paul Travelers":                      "Travelers",
+	"Nationwide Mutual":                       "Nationwide",
+	"Liberty Mutual Holding":                  "Liberty Mutual",
+	"Sears, Roebuck and":                      "Sears",
+	"Sears, Roebuck":                          "Sears",
+	"J.P. Morgan Chase":                       "J.P. Morgan",
+	"J.P. Morgan & Co. Incorporated":          "J.P. Morgan",
+	"E.I. du Pont de Nemours and":             "DuPont",
+	"E.I. Du Pont de Nemours and":             "DuPont",
+	"E.I. du Pont de Nemours":                 "DuPont",
+	"TIAA-CREF":                               "TIAA",
+	"Energy Transfer Equity":                  "Energy Transfer",
+	"Wal-Mart Stores":                         "Wal-Mart",
+	"International Paper":                     "Intl Paper",
+	"Honeywell International":                 "Honeywell",
+	"American Express":                        "AmEx",
+	"FleetBoston Financial":                   "FleetBoston",
+	"UtiliCorp United":                        "UtiliCorp",
+	"Electronic Data Systems":                 "EDS",
+	"Federated Depart\u0004ment Stores":       "Fed Dpt Stores",
+	"American International":                  "American Int",
+	"United Technologies":                     "United Tech",
+	"United Parcel Service of America":        "UPS",
+	"United Parcel Service":                   "UPS",
+	"Medco Health Solutions":                  "Medco",
+	"Prudential Insurance Company of America": "Prudential",
+	"Prudential Financial (U.S.)":             "Prudential",
+	"Prudential Financial":                    "Prudential",
+	"Rockwell International":                  "Rockwell",
+	"American Home Products":                  "American Home",
+	"Goodyear Tire \u0026 Rubber":             "Goodyear",
+	"Federal National Mortgage Association":   "Fed Mortgage",
+	"Teachers Insurance and Annuity Association College Retiremen": "Teachers Insurance",
+	"Mondelez International":             "Mondelez",
+	"Enterprise Products Partners":       "EP Partners",
+	"Massachusetts Mutual Life":          "Mass Mutual",
+	"Massachusetts Financial":            "Mass Financial",
+	"Plains All American Pipeline, L.P.": "Plains Pipeline",
+	"Twenty-First Century Fox":           "21 Century Fox",
+	"Archer-Daniels-Midland":             "ADL",
+	"Archer Daniels Midland":             "ADL",
+	"Thermo Fisher Scientific":           "Thermo Fisher",
+	"Abbott Laboratories":                "Abbott",
+	"Capital One Financial":              "Capital One",
+	"Hartford Financial Services":        "Hartford Fin",
+	// "Bristol-Myers Squibb":               "Bristol-Myers Sq",
+	"Charter Communications": "Charter Commu",
+	"Publix Super Markets":   "Publix Markets",
+	"World Fuel Services":    "World Fuel",
+	"Lucent Technologies":    "Lucent",
+
+	"Minnesota Mining & Manufacturing ": "Minnesota Mining",
+	"Minnesota Mining & Manufacturing":  "Minnesota Mining",
+	"May Department Stores":             "May Dept Stores",
+	"SBC Communications":                "SBC Comm",
+	"AmerisourceBergen":                 "Amerisource Bergen",
 }
 
 func replaceName(s string) string {
 	s = strings.TrimSpace(s)
-	if s1, ok := reps[s]; ok {
+	if s1, ok := replacements[s]; ok {
 		s = s1
 	}
 	return s
@@ -209,9 +318,16 @@ func rawList2JSON() {
 				log.Printf("cannot get the int from %v: %v", lines[i], err)
 			}
 			rnk.Name = lines[i+1]
+			rnk.Name = replaceName(rnk.Name)
 			rnk.Name = cleanseName(rnk.Name)
 			rnk.Name = cleanseName(rnk.Name)
 			rnk.Name = replaceName(rnk.Name)
+
+			rnk.Name = strings.ReplaceAll(rnk.Name, "-", " ") // for line break
+
+			if len(rnk.Name) > 16 {
+				log.Printf("too long %v", rnk.Name)
+			}
 
 			rev := lines[i+2]
 			if strings.HasPrefix(rev, "$") {
@@ -221,10 +337,11 @@ func rawList2JSON() {
 			if pos := strings.Index(rev, "."); pos > -1 {
 				rev = rev[:pos]
 			}
-			rnk.Revenue, err = strconv.Atoi(rev)
+			revInt, err := strconv.Atoi(rev)
 			if err != nil {
-				log.Printf("cannot get the int from %v: %v", rev, err)
+				log.Printf("cannot get the int from %v: %v", revInt, err)
 			}
+			rnk.Revenue = float64(revInt)
 			rankings = append(rankings, rnk)
 		}
 
@@ -236,7 +353,7 @@ func rawList2JSON() {
 				continue
 			}
 			if strings.Contains(rankings[i].Name, rankings[j].Name) {
-				log.Printf("%q part of %q", rankings[i].Name, rankings[j].Name)
+				log.Printf("%16q part of %24q", rankings[j].Name, rankings[i].Name)
 			}
 		}
 	}
@@ -301,6 +418,8 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 	}
 	rksYears = append(rksYears, rksYear)
 
+	rksYears.SetMinMax2()
+
 	bts2, err := json.MarshalIndent(rksYears, " ", "  ")
 	if err != nil {
 		log.Fatalf("cannot jsonify rksYears: %v", err)
@@ -322,14 +441,13 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 		companiesByName[rankings[i].Name] = company{Name: rankings[i].Name}
 	}
 
+	// allocate colors
 	for i := 0; i < len(companies); i++ {
-		companies[i].Color = cols[(i % len(cols))]
+		companies[i].Color = circleCols[(i % len(circleCols))]
 		companiesByName[companies[i].Name] = companies[i]
-		// log.Printf("%4v %-22v - %v  - col %v", i, companies[i].Name, (i % len(cols)), companies[i].Color)
 	}
 
 	log.Printf("Found %v distinct companies", len(companies))
-	log.Printf("Found %v distinct companies", len(companiesByName))
 
 	bts3, err := json.MarshalIndent(companiesByName, " ", "  ")
 	if err != nil {
