@@ -16,14 +16,20 @@ type Ranking struct {
 	Year    int
 	Rank    int
 	Name    string
+	Short   string // upper case
 	Revenue float64
 }
 
 type RankingsYear struct {
-	Year     int
-	Min      float64 // Min revenue from all companies in this year
-	Max      float64 // ...
-	Rankings []Ranking
+	Year    int
+	Min     float64 // Min revenue from all companies in this year
+	Max     float64 // ...
+	Quant95 float64 // revenue 95 percent
+
+	MinTotal     float64 // across all years
+	MaxTotal     float64 // ...
+	Quant95Total float64 // ...
+	Rankings     []Ranking
 }
 
 type RankingsYears []RankingsYear
@@ -40,21 +46,18 @@ func (rksyrs RankingsYears) Years() []int {
 	return yrs
 }
 
-func (rksyrs *RankingsYears) SetMinMax() {
-	for i := 0; i < len(*rksyrs); i++ {
-		(*rksyrs)[i].Min = math.MaxFloat64
-		(*rksyrs)[i].Max = -math.MaxFloat64
-		for j := 0; j < len((*rksyrs)[i].Rankings); j++ {
-			if (*rksyrs)[i].Min > (*rksyrs)[i].Rankings[j].Revenue {
-				(*rksyrs)[i].Min = (*rksyrs)[i].Rankings[j].Revenue
-			}
-			if (*rksyrs)[i].Max < (*rksyrs)[i].Rankings[j].Revenue {
-				(*rksyrs)[i].Max = (*rksyrs)[i].Rankings[j].Revenue
-			}
+func (rksyrs RankingsYears) Deflate() {
+	deflY := 1.04
+	defl := 1.0
+	for i := 0; i < len(rksyrs); i++ {
+		defl *= deflY
+		for j := 0; j < len(rksyrs[i].Rankings); j++ {
+			rksyrs[i].Rankings[j].Revenue /= defl
 		}
 	}
 }
-func (rksyrs RankingsYears) SetMinMax2() {
+
+func (rksyrs RankingsYears) SetMinMax() {
 	for i := 0; i < len(rksyrs); i++ {
 		rksyrs[i].Min = math.MaxFloat64
 		rksyrs[i].Max = -math.MaxFloat64
@@ -69,34 +72,105 @@ func (rksyrs RankingsYears) SetMinMax2() {
 	}
 }
 
+func (rksyrs RankingsYears) SetMinMaxTotal() {
+	min := math.MaxFloat64
+	max := -math.MaxFloat64
+	for i := 0; i < len(rksyrs); i++ {
+		if min > rksyrs[i].Min {
+			min = rksyrs[i].Min
+		}
+		if max < rksyrs[i].Max {
+			max = rksyrs[i].Max
+		}
+	}
+	for i := 0; i < len(rksyrs); i++ {
+		rksyrs[i].MinTotal = min
+		rksyrs[i].MaxTotal = max
+	}
+}
+
+const quant95 = 90
+
+func (rksyrs RankingsYears) Quant95() {
+	for i := 0; i < len(rksyrs); i++ {
+		rksyrs[i].Quant95 = rksyrs[i].Rankings[quant95].Revenue
+	}
+}
+
+func (rksyrs RankingsYears) Quant95Total() {
+	all := make([]Ranking, 0, len(rksyrs)*103)
+	for i := 0; i < len(rksyrs); i++ {
+		all = append(all, rksyrs[i].Rankings...)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].Revenue > all[j].Revenue {
+			return false
+		}
+		return true
+	})
+	// dbg.Dump(all[0:5])
+	// dbg.Dump(all[len(all)-5:])
+	idx95 := math.Floor(float64(len(all)) / 100 * quant95)
+	for i := 0; i < len(rksyrs); i++ {
+		rksyrs[i].Quant95Total = all[int(idx95)].Revenue
+	}
+
+}
+
+func (rksyrs RankingsYears) NamesShort() {
+	for i := 0; i < len(rksyrs); i++ {
+		for j := 0; j < len(rksyrs[i].Rankings); j++ {
+			sh := ""
+			for _, rn := range rksyrs[i].Rankings[j].Name {
+				s := string(rn)
+				if s == " " {
+					continue
+				}
+				if s == strings.ToUpper(s) {
+					sh += s
+				}
+			}
+			if len(sh) < 2 {
+				sh = rksyrs[i].Rankings[j].Name[:3]
+			}
+			if len(sh) > 4 {
+				sh = rksyrs[i].Rankings[j].Name[:5]
+			}
+			rksyrs[i].Rankings[j].Short = sh
+		}
+	}
+}
+
 var circleCols = []color.RGBA{
 	// {0x00, 0x00, 0x00, 0xff}, // not black
 
-	{0x00, 0x00, 0x88, 0xff},
-	{0x00, 0x00, 0x44, 0xff},
+	{0, 0, 192, 255},
+	{0, 0, 128, 255},
 
-	{0x00, 0x88, 0x00, 0xff},
-	{0x00, 0x44, 0x00, 0xff},
+	{0, 192, 0, 255},
+	{0, 128, 0, 255},
 
-	{0x00, 0x88, 0x88, 0xff},
-	{0x00, 0x88, 0x44, 0xff},
-	{0x00, 0x44, 0x88, 0xff},
-	{0x00, 0x44, 0x44, 0xff},
+	{0, 192, 192, 255},
+	{0, 192, 128, 255},
+	{0, 128, 192, 255},
+	{0, 128, 128, 255},
 
-	{0x88, 0x00, 0x00, 0xff},
-	{0x44, 0x00, 0x00, 0xff},
+	{192, 0, 0, 255},
+	{128, 0, 0, 255},
 
-	{0x88, 0x00, 0x88, 0xff},
-	{0x88, 0x00, 0x44, 0xff},
-	{0x44, 0x00, 0x88, 0xff},
-	{0x44, 0x00, 0x44, 0xff},
+	{192, 0, 192, 255},
+	{192, 0, 128, 255},
+	{128, 0, 192, 255},
+	{128, 0, 128, 255},
 
-	{0x88, 0x88, 0x00, 0xff},
-	{0x88, 0x44, 0x00, 0xff},
-	{0x44, 0x88, 0x00, 0xff},
-	{0x44, 0x44, 0x00, 0xff},
+	{192, 192, 0, 255},
+	{192, 128, 0, 255},
+	{128, 192, 0, 255},
+	{128, 128, 0, 255},
 
-	// {0xff, 0xff, 0xff, 0xff}, // not white
+	{128, 128, 128, 255}, // for get Walmart != Amazon
+
+	// {0xff, 0xff, 0xff, 255}, // not white
 }
 
 // company is a helper struct
@@ -158,6 +232,8 @@ func cleanseName(s string) string {
 }
 
 var replacements = map[string]string{
+	"Wal-Mart Stores": "Walmart",
+
 	"American International Group,Inc.": "AIG",
 	"American International Group":      "AIG",
 	"Enterprise GP Holdings, L.P.":      "Enterpr GP Hd",
@@ -209,7 +285,6 @@ var replacements = map[string]string{
 	"E.I. du Pont de Nemours":                 "DuPont",
 	"TIAA-CREF":                               "TIAA",
 	"Energy Transfer Equity":                  "Energy Transfer",
-	"Wal-Mart Stores":                         "Wal-Mart",
 	"International Paper":                     "Intl Paper",
 	"Honeywell International":                 "Honeywell",
 	"American Express":                        "AmEx",
@@ -418,7 +493,12 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 	}
 	rksYears = append(rksYears, rksYear)
 
-	rksYears.SetMinMax2()
+	rksYears.Deflate()
+	rksYears.SetMinMax()
+	rksYears.SetMinMaxTotal()
+	rksYears.Quant95()
+	rksYears.Quant95Total()
+	rksYears.NamesShort()
 
 	bts2, err := json.MarshalIndent(rksYears, " ", "  ")
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 
 	"github.com/fogleman/gg"
@@ -21,40 +22,47 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 
 	c := gg.NewContext(int(w), int(h))
 	fontSize := 96.0
-	fontSize = 14.0
 	fontSize = 12.0
 	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
 		log.Fatalf("Cannot load font: %v", err)
 	}
+
 	scale100 := float64(w) / float64(100)
+	if h < w {
+		scale100 = float64(h) / float64(100) // shorter side dominates
+	}
 
 	// funcs as closures to reduce number of parameters
-	cntr2 := 0
-	draw := func(x, y, rad, revenue, maxRev float64) {
+	drwC := func(x, y, bx, revenue, maxRev float64) {
 
-		rd := revenue / maxRev * rad // max rad
+		boxRad := bx / 2
+		rd := revenue / maxRev * boxRad // max rad
 
-		rdScaled := 6 * rd
-		if rdScaled > rad {
-			rdScaled = rad
+		scaleUp := 4.0
+		scaleUp = 2.0
+		scaleUp = 1.0
+		rdScaled := scaleUp * rd
+		if rdScaled > boxRad {
+			// rdScaled = boxRad
 		}
 
-		cntr2++
-		if cntr2%13 == 0 {
-			log.Printf("%11v %11v - %5.2v - %5.2v - %5.2v", revenue, maxRev, revenue/maxRev, revenue/maxRev*rad, rdScaled)
-		}
-
-		c.DrawCircle(scale100*x, scale100*y, scale100*rdScaled)
+		// c.DrawCircle(scale100*x, scale100*y, scale100*rdScaled)
+		c.DrawCircle(
+			scale100*x,
+			scale100*(y+boxRad),
+			scale100*rdScaled,
+		)
 	}
-	text := func(x, y, w float64, s string) {
+	drwTxt := func(x, y, bx float64, s string) {
 		c.SetRGB(0.95, 0.95, 0.95)
 		// c.DrawString(s, scale100*x, scale100*y+c.FontHeight())
 		// c.DrawStringAnchored(s, scale100*x, scale100*y, 0.5, 0.5)
 		c.DrawStringWrapped(
 			s,
-			scale100*x, scale100*y,
-			0.5, 0.5,
-			w,
+			scale100*x, scale100*(y+bx),
+			// 0.5, 0.5,
+			0.5, 0.99,
+			bx*0.95,
 			1.3,
 			gg.AlignCenter,
 		)
@@ -76,34 +84,61 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 		cx := 0.0
 		bx := 16.0 // box size - displacement
 		bx = 12.0
-		bx = 9.0
+		bx = 9.0 // eleven per row
+		bx = 9.8 // ten per row - slightly
 
 		row := 0.0
+		// log.Print(" ")
+		// log.Printf("row %v", row)
+
 		for i := 0; i < len(rksYears[cntr].Rankings); i++ {
+
+			// ten per row
+			if len(rksYears[cntr].Rankings)-i > 100 {
+				// equalize number of rankings between 101 and 100
+				continue
+			}
+
+			// eleven per row
+			// if len(rksYears[cntr].Rankings)-i > 99 {
+			// 	// equalize number of rankings between 101 and 100
+			// 	continue
+			// }
 
 			rv := rksYears[cntr].Rankings[i].Revenue
 			nm := rksYears[cntr].Rankings[i].Name
-
-			cx += bx
+			sh := rksYears[cntr].Rankings[i].Short
 
 			if cx+bx >= 100 {
 				cx = 0
 				row++
-				// log.Printf("row %3v", row)
+				// log.Printf("row %v", row)
 			}
+
+			cx += bx
 
 			x := cx + bx/2
 
-			// log.Printf("  cx is %3v - x %3v", cx, x)
-
 			y := 100 - bx - (row * bx)
+
+			// if i%5 == 0 {
+			// 	log.Printf("  cx %3.0f    x %3.0f    row %2.0v    y %3.0f", cx, x, row, y)
+			// }
+
+			if false {
+				c.DrawRectangle(scale100*(x-bx/2+1), scale100*(y+1), scale100*(bx-2), scale100*(bx-2))
+				c.SetColor(color.RGBA{44, 44, 44, 55})
+				c.Fill()
+			}
+
 			// c.DrawCircle(x, y, 8.0)
-			draw(x, y, bx/2, rv, rksYears[cntr].Max)
+			// drwC(x, y, bx, rv, rksYears[cntr].MaxTotal)
+			drwC(x, y, bx, rv, rksYears[cntr].Quant95Total)
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
 
-			text(x, y, bx, nm)
+			drwTxt(x, y, bx, sh)
 
 		}
 
@@ -121,6 +156,8 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 		} else {
 			delays = append(delays, (len(years)-cntr)*elongation)
 		}
+
+		// break
 
 	}
 
