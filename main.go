@@ -16,9 +16,8 @@ func main() {
 
 	// rawList2JSON()
 
-	rankings, rksYears, companies, compantiesByName := organize()
+	// organize()
 
-	_, _ = rankings, companies
-	stockMarket2(rksYears, compantiesByName)
+	stockMarket2()
 
 }

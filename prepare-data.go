@@ -21,15 +21,17 @@ type Ranking struct {
 }
 
 type RankingsYear struct {
-	Year    int
-	Min     float64 // Min revenue from all companies in this year
-	Max     float64 // ...
-	Quant95 float64 // revenue 95 percent
+	Year     int
+	Min      float64 // Min revenue from all companies in this year
+	Max      float64 // ...
+	MinTotal float64 // across all years
+	MaxTotal float64 // ...
 
-	MinTotal     float64 // across all years
-	MaxTotal     float64 // ...
-	Quant95Total float64 // ...
-	Rankings     []Ranking
+	// various quantiles across all years
+	//   i.e. Q[50] holds the median revenue - 50 percent
+	Qs map[int]float64
+
+	Rankings []Ranking
 }
 
 type RankingsYears []RankingsYear
@@ -46,13 +48,14 @@ func (rksyrs RankingsYears) Years() []int {
 	return yrs
 }
 
-func (rksyrs RankingsYears) Deflate() {
-	deflY := 1.04
-	defl := 1.0
+func (rksyrs RankingsYears) Deflate(deflator float64) {
+	yr0 := rksyrs.Years()[0]
 	for i := 0; i < len(rksyrs); i++ {
-		defl *= deflY
+		// cumulative inflation
+		cuml := math.Pow(deflator, float64(rksyrs[i].Year-yr0))
+		log.Printf("Deflator for yr %v is %4.2f  (%v**%2v)", rksyrs[i].Year, cuml, deflator, rksyrs[i].Year-yr0)
 		for j := 0; j < len(rksyrs[i].Rankings); j++ {
-			rksyrs[i].Rankings[j].Revenue /= defl
+			rksyrs[i].Rankings[j].Revenue /= cuml
 		}
 	}
 }
@@ -89,15 +92,7 @@ func (rksyrs RankingsYears) SetMinMaxTotal() {
 	}
 }
 
-const quant95 = 90
-
-func (rksyrs RankingsYears) Quant95() {
-	for i := 0; i < len(rksyrs); i++ {
-		rksyrs[i].Quant95 = rksyrs[i].Rankings[quant95].Revenue
-	}
-}
-
-func (rksyrs RankingsYears) Quant95Total() {
+func (rksyrs RankingsYears) QuantilesTotal() {
 	all := make([]Ranking, 0, len(rksyrs)*103)
 	for i := 0; i < len(rksyrs); i++ {
 		all = append(all, rksyrs[i].Rankings...)
@@ -110,9 +105,26 @@ func (rksyrs RankingsYears) Quant95Total() {
 	})
 	// dbg.Dump(all[0:5])
 	// dbg.Dump(all[len(all)-5:])
-	idx95 := math.Floor(float64(len(all)) / 100 * quant95)
+
 	for i := 0; i < len(rksyrs); i++ {
-		rksyrs[i].Quant95Total = all[int(idx95)].Revenue
+		for quantile, _ := range rksyrs[i].Qs {
+			idxQ := math.Floor(float64(len(all)) / 100 * float64(quantile))
+			for i := 0; i < len(rksyrs); i++ {
+				rksyrs[i].Qs[quantile] = all[int(idxQ)].Revenue
+			}
+		}
+		if i == len(rksyrs)-1 {
+			log.Printf("Min Total   %12.0f", rksyrs[i].MinTotal)
+			quants := make([]int, 0, len(rksyrs[i].Qs))
+			for quant, _ := range rksyrs[i].Qs {
+				quants = append(quants, quant)
+			}
+			sort.Ints(quants)
+			for _, quant := range quants {
+				log.Printf("Quantile %02v %12.0f", quant, rksyrs[i].Qs[quant])
+			}
+			log.Printf("Max Total   %12.0f", rksyrs[i].MaxTotal)
+		}
 	}
 
 }
@@ -317,11 +329,10 @@ var replacements = map[string]string{
 	"Abbott Laboratories":                "Abbott",
 	"Capital One Financial":              "Capital One",
 	"Hartford Financial Services":        "Hartford Fin",
-	// "Bristol-Myers Squibb":               "Bristol-Myers Sq",
-	"Charter Communications": "Charter Commu",
-	"Publix Super Markets":   "Publix Markets",
-	"World Fuel Services":    "World Fuel",
-	"Lucent Technologies":    "Lucent",
+	"Charter Communications":             "Charter Commu",
+	"Publix Super Markets":               "Publix Markets",
+	"World Fuel Services":                "World Fuel",
+	"Lucent Technologies":                "Lucent",
 
 	"Minnesota Mining & Manufacturing ": "Minnesota Mining",
 	"Minnesota Mining & Manufacturing":  "Minnesota Mining",
@@ -338,6 +349,10 @@ func replaceName(s string) string {
 	return s
 }
 
+// rawList2JSON parses string to numbers,
+// removes 'comp.', ', inc.' in dozens of variations - a kind of 'stemming'
+// normalizes company names dozens of namings
+// saves into a flat list of rankings at ./out/rankings.json
 func rawList2JSON() {
 
 	rankings := []Ranking{}
@@ -444,7 +459,8 @@ func rawList2JSON() {
 
 }
 
-func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
+// organize hierarchifies flat rankings by year
+func organize() {
 
 	bts1, err := os.ReadFile("./out/rankings.json")
 	if err != nil {
@@ -475,6 +491,7 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 	// dbg.Dump(rankings[98:102])
 	// dbg.Dump(rankings[len(rankings)-4:])
 
+	// new structure - rankings by years
 	last := -1
 	rksYears := RankingsYears{}
 	var rksYear RankingsYear
@@ -488,16 +505,22 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 			rksYear = RankingsYear{}
 			rksYear.Year = rankings[i].Year
 			rksYear.Rankings = []Ranking{}
+			// init map for quantiles
+			rksYear.Qs = map[int]float64{
+				50: 0,
+				75: 0,
+				90: 0,
+				95: 0,
+			}
 		}
 		rksYear.Rankings = append(rksYear.Rankings, rankings[i])
 	}
 	rksYears = append(rksYears, rksYear)
 
-	rksYears.Deflate()
+	rksYears.Deflate(1.025) // cautious
 	rksYears.SetMinMax()
 	rksYears.SetMinMaxTotal()
-	rksYears.Quant95()
-	rksYears.Quant95Total()
+	rksYears.QuantilesTotal()
 	rksYears.NamesShort()
 
 	bts2, err := json.MarshalIndent(rksYears, " ", "  ")
@@ -541,6 +564,36 @@ func organize() ([]Ranking, RankingsYears, []company, map[string]company) {
 	// dbg.Dump(companies[:4])
 	// dbg.Dump(companies[len(companies)-4:])
 
-	return rankings, rksYears, companies, companiesByName
+}
 
+func readRankingsYears() RankingsYears {
+
+	bts, err := os.ReadFile("./out/rksYears.json")
+	if err != nil {
+		log.Fatalf("cannot read file ./out/rksYears.json: %v", err)
+	}
+
+	rankingsYears := RankingsYears{}
+	err = json.Unmarshal(bts, &rankingsYears)
+	if err != nil {
+		log.Fatalf("cannot unmarshal ./out/rksYears.json: %v", err)
+	}
+
+	return rankingsYears
+}
+
+func readCompaniesByYears() map[string]company {
+
+	bts, err := os.ReadFile("./out/companiesByName.json")
+	if err != nil {
+		log.Fatalf("cannot read file ./out/companiesByName.json: %v", err)
+	}
+
+	companiesByName := map[string]company{}
+	err = json.Unmarshal(bts, &companiesByName)
+	if err != nil {
+		log.Fatalf("cannot unmarshal ./out/companiesByName.json: %v", err)
+	}
+
+	return companiesByName
 }

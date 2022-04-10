@@ -9,7 +9,10 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
+func stockMarket2() {
+
+	rksYears := readRankingsYears()
+	companiesByName := readCompaniesByYears()
 
 	var images []*image.Paletted
 	var delays []int
@@ -17,6 +20,7 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 	var w, h float64
 	w = 1024
 	h = 768
+	wOverH := 1024 * 100.0 / 768
 
 	years := rksYears.Years()
 
@@ -36,21 +40,12 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 	drwC := func(x, y, bx, revenue, maxRev float64) {
 
 		boxRad := bx / 2
-		rd := revenue / maxRev * boxRad // max rad
+		cRad := revenue / maxRev * boxRad // circle rad
 
-		scaleUp := 4.0
-		scaleUp = 2.0
-		scaleUp = 1.0
-		rdScaled := scaleUp * rd
-		if rdScaled > boxRad {
-			// rdScaled = boxRad
-		}
-
-		// c.DrawCircle(scale100*x, scale100*y, scale100*rdScaled)
 		c.DrawCircle(
 			scale100*x,
 			scale100*(y+boxRad),
-			scale100*rdScaled,
+			scale100*cRad,
 		)
 	}
 	drwTxt := func(x, y, bx float64, s string) {
@@ -82,14 +77,16 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 		c.DrawString(fmt.Sprintf("Yr %v", yr), 5, 5+c.FontHeight())
 
 		cx := 0.0
+		cy := 0.0
 		bx := 16.0 // box size - displacement
 		bx = 12.0
 		bx = 9.0 // eleven per row
 		bx = 9.8 // ten per row - slightly
+		bx = 7.8
 
-		row := 0.0
+		lpQuantile := 0
+
 		// log.Print(" ")
-		// log.Printf("row %v", row)
 
 		for i := 0; i < len(rksYears[cntr].Rankings); i++ {
 
@@ -99,27 +96,27 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 				continue
 			}
 
-			// eleven per row
-			// if len(rksYears[cntr].Rankings)-i > 99 {
-			// 	// equalize number of rankings between 101 and 100
-			// 	continue
-			// }
-
 			rv := rksYears[cntr].Rankings[i].Revenue
 			nm := rksYears[cntr].Rankings[i].Name
 			sh := rksYears[cntr].Rankings[i].Short
 
-			if cx+bx >= 100 {
+			rowFull := cx+bx >= wOverH
+			newQuantile := rv > rksYears[cntr].Qs[90] && lpQuantile != 90
+
+			if newQuantile {
+				bx *= 1.3
+				lpQuantile = 90
+				log.Printf("Yr %v-Quant chg %v", yr, i)
+			}
+			if rowFull || newQuantile {
 				cx = 0
-				row++
-				// log.Printf("row %v", row)
+				cy += bx
 			}
 
+			x := cx + bx/2
 			cx += bx
 
-			x := cx + bx/2
-
-			y := 100 - bx - (row * bx)
+			y := 100 - bx - cy
 
 			// if i%5 == 0 {
 			// 	log.Printf("  cx %3.0f    x %3.0f    row %2.0v    y %3.0f", cx, x, row, y)
@@ -133,7 +130,7 @@ func stockMarket2(rksYears RankingsYears, companiesByName map[string]company) {
 
 			// c.DrawCircle(x, y, 8.0)
 			// drwC(x, y, bx, rv, rksYears[cntr].MaxTotal)
-			drwC(x, y, bx, rv, rksYears[cntr].Quant95Total)
+			drwC(x, y, bx, rv, rksYears[cntr].Qs[90])
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
