@@ -20,6 +20,10 @@ func stockMarket2() {
 	var w, h float64
 	w = 1024
 	h = 768
+
+	// all rendering arguments are standardized to
+	//   100 units of canvas height;
+	//   thus, 133.3 is the according max width
 	wOverH := 1024 * 100.0 / 768
 
 	years := rksYears.Years()
@@ -37,10 +41,9 @@ func stockMarket2() {
 	}
 
 	// funcs as closures to reduce number of parameters
-	drwC := func(x, y, bx, revenue, maxRev float64) {
+	drwC := func(x, y, boxRad, revenue, mxRv float64) {
 
-		boxRad := bx / 2
-		cRad := revenue / maxRev * boxRad // circle rad
+		cRad := revenue / mxRv * boxRad // circle rad
 
 		c.DrawCircle(
 			scale100*x,
@@ -63,6 +66,8 @@ func stockMarket2() {
 		)
 	}
 
+	newRowOnQuant := false
+
 	//
 	//
 	cntr := -1
@@ -78,13 +83,10 @@ func stockMarket2() {
 
 		cx := 0.0
 		cy := 0.0
-		bx := 16.0 // box size - displacement
-		bx = 12.0
-		bx = 9.0 // eleven per row
-		bx = 9.8 // ten per row - slightly
-		bx = 7.8
+		bx := 7.8 // 133 / 7.8 => roughly 17
 
 		lpQuantile := 0
+		maxRev := rksYears[cntr].Qs[90]
 
 		// log.Print(" ")
 
@@ -103,14 +105,31 @@ func stockMarket2() {
 			rowFull := cx+bx >= wOverH
 			newQuantile := rv > rksYears[cntr].Qs[90] && lpQuantile != 90
 
-			if newQuantile {
-				bx *= 1.3
-				lpQuantile = 90
-				log.Printf("Yr %v-Quant chg %v", yr, i)
+			if rowFull {
+				if !newRowOnQuant {
+					cx = 0
+					cy += bx // before computing new bx
+				}
 			}
 			if rowFull || newQuantile {
-				cx = 0
-				cy += bx
+				if newRowOnQuant {
+					cx = 0
+					cy += bx // before computing new bx
+
+				}
+			}
+			if newQuantile {
+
+				sizeUp := rksYears[cntr].Qs[98] / rksYears[cntr].Qs[90] * 0.98
+
+				log.Printf("sizing up the box from %5.1f to %5.1f", bx, bx*sizeUp*1.2)
+
+				bx *= sizeUp
+
+				lpQuantile = 90
+				maxRev = rksYears[cntr].Qs[98]
+
+				log.Printf("Yr %v-Quant chg %v", yr, i)
 			}
 
 			x := cx + bx/2
@@ -122,15 +141,13 @@ func stockMarket2() {
 			// 	log.Printf("  cx %3.0f    x %3.0f    row %2.0v    y %3.0f", cx, x, row, y)
 			// }
 
-			if false {
-				c.DrawRectangle(scale100*(x-bx/2+1), scale100*(y+1), scale100*(bx-2), scale100*(bx-2))
-				c.SetColor(color.RGBA{44, 44, 44, 55})
+			if true {
+				c.DrawRectangle(scale100*(x-bx/2+0.3), scale100*(y+0.3), scale100*(bx-0.6), scale100*(bx-0.6))
+				c.SetColor(color.RGBA{32, 32, 32, 80})
 				c.Fill()
 			}
 
-			// c.DrawCircle(x, y, 8.0)
-			// drwC(x, y, bx, rv, rksYears[cntr].MaxTotal)
-			drwC(x, y, bx, rv, rksYears[cntr].Qs[90])
+			drwC(x, y, bx/2, rv, maxRev)
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
