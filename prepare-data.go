@@ -24,24 +24,28 @@ type RankingsYear struct {
 	Year     int
 	Min      float64 // Min revenue from all companies in this year
 	Max      float64 // ...
-	MinTotal float64 // across all years
-	MaxTotal float64 // ...
+	Rankings []Ranking
+}
+
+//
+type RankingsYears struct {
+	// redundant - same for each
+	MinTtl float64 // across all years
+	MaxTtl float64 // ...
 
 	// various quantiles across all years
 	//   i.e. Q[50] holds the median revenue - 50 percent
 	Qs map[int]float64
 
-	Rankings []Ranking
+	RkgsYear []RankingsYear
 }
-
-type RankingsYears []RankingsYear
 
 func (rksyrs RankingsYears) Years() []int {
 	yrs := make([]int, 0, 10)
 	last := -1
-	for i := 0; i < len(rksyrs); i++ {
-		if rksyrs[i].Year != last {
-			last = rksyrs[i].Year
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
+		if rksyrs.RkgsYear[i].Year != last {
+			last = rksyrs.RkgsYear[i].Year
 			yrs = append(yrs, last)
 		}
 	}
@@ -50,52 +54,54 @@ func (rksyrs RankingsYears) Years() []int {
 
 func (rksyrs RankingsYears) Deflate(deflator float64) {
 	yr0 := rksyrs.Years()[0]
-	for i := 0; i < len(rksyrs); i++ {
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
 		// cumulative inflation
-		cuml := math.Pow(deflator, float64(rksyrs[i].Year-yr0))
-		log.Printf("Deflator for yr %v is %4.2f  (%v**%2v)", rksyrs[i].Year, cuml, deflator, rksyrs[i].Year-yr0)
-		for j := 0; j < len(rksyrs[i].Rankings); j++ {
-			rksyrs[i].Rankings[j].Revenue /= cuml
+		cuml := math.Pow(deflator, float64(rksyrs.RkgsYear[i].Year-yr0))
+		log.Printf("Deflator for yr %v is %4.2f  (%v**%2v)", rksyrs.RkgsYear[i].Year, cuml, deflator, rksyrs.RkgsYear[i].Year-yr0)
+		for j := 0; j < len(rksyrs.RkgsYear[i].Rankings); j++ {
+			rksyrs.RkgsYear[i].Rankings[j].Revenue /= cuml
 		}
 	}
 }
 
 func (rksyrs RankingsYears) SetMinMax() {
-	for i := 0; i < len(rksyrs); i++ {
-		rksyrs[i].Min = math.MaxFloat64
-		rksyrs[i].Max = -math.MaxFloat64
-		for j := 0; j < len(rksyrs[i].Rankings); j++ {
-			if rksyrs[i].Min > rksyrs[i].Rankings[j].Revenue {
-				rksyrs[i].Min = rksyrs[i].Rankings[j].Revenue
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
+		rksyrs.RkgsYear[i].Min = math.MaxFloat64
+		rksyrs.RkgsYear[i].Max = -math.MaxFloat64
+		for j := 0; j < len(rksyrs.RkgsYear[i].Rankings); j++ {
+			if rksyrs.RkgsYear[i].Min > rksyrs.RkgsYear[i].Rankings[j].Revenue {
+				rksyrs.RkgsYear[i].Min = rksyrs.RkgsYear[i].Rankings[j].Revenue
 			}
-			if rksyrs[i].Max < rksyrs[i].Rankings[j].Revenue {
-				rksyrs[i].Max = rksyrs[i].Rankings[j].Revenue
+			if rksyrs.RkgsYear[i].Max < rksyrs.RkgsYear[i].Rankings[j].Revenue {
+				rksyrs.RkgsYear[i].Max = rksyrs.RkgsYear[i].Rankings[j].Revenue
 			}
 		}
+		rksyrs.RkgsYear[i].Max = math.Floor(rksyrs.RkgsYear[i].Max/1000) * 1000 // rounded by thousands
+		rksyrs.RkgsYear[i].Min = math.Floor(rksyrs.RkgsYear[i].Min/1000) * 1000
 	}
+
 }
 
-func (rksyrs RankingsYears) SetMinMaxTotal() {
+func (rksyrs *RankingsYears) SetMinMaxTotal() {
 	min := math.MaxFloat64
 	max := -math.MaxFloat64
-	for i := 0; i < len(rksyrs); i++ {
-		if min > rksyrs[i].Min {
-			min = rksyrs[i].Min
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
+		if min > rksyrs.RkgsYear[i].Min {
+			min = rksyrs.RkgsYear[i].Min
 		}
-		if max < rksyrs[i].Max {
-			max = rksyrs[i].Max
+		if max < rksyrs.RkgsYear[i].Max {
+			max = rksyrs.RkgsYear[i].Max
 		}
 	}
-	for i := 0; i < len(rksyrs); i++ {
-		rksyrs[i].MinTotal = min
-		rksyrs[i].MaxTotal = max
-	}
+	rksyrs.MinTtl = math.Floor(min/1000) * 1000 // rounded by thousands
+	rksyrs.MaxTtl = math.Floor(max/1000) * 1000
 }
 
 func (rksyrs RankingsYears) QuantilesTotal() {
-	all := make([]Ranking, 0, len(rksyrs)*103)
-	for i := 0; i < len(rksyrs); i++ {
-		all = append(all, rksyrs[i].Rankings...)
+
+	all := make([]Ranking, 0, len(rksyrs.RkgsYear)*103) // across all years
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
+		all = append(all, rksyrs.RkgsYear[i].Rankings...)
 	}
 	sort.Slice(all, func(i, j int) bool {
 		if all[i].Revenue > all[j].Revenue {
@@ -106,37 +112,36 @@ func (rksyrs RankingsYears) QuantilesTotal() {
 	// dbg.Dump(all[0:5])
 	// dbg.Dump(all[len(all)-5:])
 
-	for i := 0; i < len(rksyrs); i++ {
-		for quantile := range rksyrs[i].Qs {
-			idxQ := math.Floor(float64(len(all)) / 100 * float64(quantile))
-			for i := 0; i < len(rksyrs); i++ {
-				rksyrs[i].Qs[quantile] = all[int(idxQ)].Revenue
-			}
-		}
-		rksyrs[i].Qs[0] = rksyrs[i].MinTotal
-		rksyrs[i].Qs[100] = rksyrs[i].MaxTotal
-		// only debug output
-		if i == len(rksyrs)-1 {
-			// log.Printf("Min Total   %12.0f", rksyrs[i].MinTotal)
-			quants := make([]int, 0, len(rksyrs[i].Qs))
-			for quant, _ := range rksyrs[i].Qs {
-				quants = append(quants, quant)
-			}
-			sort.Ints(quants)
-			for _, quant := range quants {
-				log.Printf("Quantile %3v %12.0f", quant, rksyrs[i].Qs[quant])
-			}
-			// log.Printf("Max Total   %12.0f", rksyrs[i].MaxTotal)
+	for quantile := range rksyrs.Qs {
+		idxQ := int(math.Floor(float64(len(all)) / 100 * float64(quantile)))
+		log.Printf("quantile %3v has idx %3v of %v", quantile, idxQ, len(all))
+		for i := 0; i < len(rksyrs.RkgsYear); i++ {
+			rksyrs.Qs[quantile] = all[idxQ].Revenue
 		}
 	}
+
+	rksyrs.Qs[000] = rksyrs.MinTtl
+	rksyrs.Qs[100] = rksyrs.MaxTtl
+
+	// only debug output
+	// log.Printf("Min Total   %12.0f", rksyrs.RkgsYear[i].MinTotal)
+	quants := make([]int, 0, len(rksyrs.Qs))
+	for quant, _ := range rksyrs.Qs {
+		quants = append(quants, quant)
+	}
+	sort.Ints(quants)
+	for _, quant := range quants {
+		log.Printf("quantile %3v %12.0f", quant, rksyrs.Qs[quant])
+	}
+	// log.Printf("Max Total   %12.0f", rksyrs.RkgsYear[i].MaxTotal)
 
 }
 
 func (rksyrs RankingsYears) NamesShort() {
-	for i := 0; i < len(rksyrs); i++ {
-		for j := 0; j < len(rksyrs[i].Rankings); j++ {
+	for i := 0; i < len(rksyrs.RkgsYear); i++ {
+		for j := 0; j < len(rksyrs.RkgsYear[i].Rankings); j++ {
 			sh := ""
-			for _, rn := range rksyrs[i].Rankings[j].Name {
+			for _, rn := range rksyrs.RkgsYear[i].Rankings[j].Name {
 				s := string(rn)
 				if s == " " {
 					continue
@@ -146,12 +151,12 @@ func (rksyrs RankingsYears) NamesShort() {
 				}
 			}
 			if len(sh) < 2 {
-				sh = rksyrs[i].Rankings[j].Name[:3]
+				sh = rksyrs.RkgsYear[i].Rankings[j].Name[:3]
 			}
 			if len(sh) > 4 {
-				sh = rksyrs[i].Rankings[j].Name[:5]
+				sh = rksyrs.RkgsYear[i].Rankings[j].Name[:5]
 			}
-			rksyrs[i].Rankings[j].Short = sh
+			rksyrs.RkgsYear[i].Rankings[j].Short = sh
 		}
 	}
 }
@@ -497,36 +502,37 @@ func organize() {
 	// new structure - rankings by years
 	last := -1
 	rksYears := RankingsYears{}
+	// init map for quantiles
+	rksYears.Qs = map[int]float64{
+		50: 0,
+		75: 0,
+		90: 0,
+		95: 0,
+		97: 0,
+		98: 0,
+	}
+
 	var rksYear RankingsYear
 	for i := 0; i < len(rankings); i++ {
 		if rankings[i].Year != last {
 			if last > -1 {
-				rksYears = append(rksYears, rksYear)
+				rksYears.RkgsYear = append(rksYears.RkgsYear, rksYear)
 			}
 			last = rankings[i].Year
 			// init new
 			rksYear = RankingsYear{}
 			rksYear.Year = rankings[i].Year
 			rksYear.Rankings = []Ranking{}
-			// init map for quantiles
-			rksYear.Qs = map[int]float64{
-				50: 0,
-				75: 0,
-				90: 0,
-				95: 0,
-				97: 0,
-				98: 0,
-			}
 		}
 		rksYear.Rankings = append(rksYear.Rankings, rankings[i])
 	}
-	rksYears = append(rksYears, rksYear)
+	rksYears.RkgsYear = append(rksYears.RkgsYear, rksYear)
 
+	rksYears.NamesShort()
 	rksYears.Deflate(1.025) // cautious
 	rksYears.SetMinMax()
 	rksYears.SetMinMaxTotal()
-	rksYears.QuantilesTotal()
-	rksYears.NamesShort()
+	// rksYears.QuantilesTotal()
 
 	bts2, err := json.MarshalIndent(rksYears, " ", "  ")
 	if err != nil {

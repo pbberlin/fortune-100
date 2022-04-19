@@ -11,7 +11,10 @@ import (
 
 func stockMarket2() {
 
-	rksYears := readRankingsYears()
+	rksyrs := readRankingsYears()
+
+	rksyrs.QuantilesTotal()
+
 	companiesByName := readCompaniesByYears()
 
 	var images []*image.Paletted
@@ -26,7 +29,7 @@ func stockMarket2() {
 	//   thus, 133.3 is the according max width
 	wOverH := 1024 * 100.0 / 768
 
-	years := rksYears.Years()
+	years := rksyrs.Years()
 
 	c := gg.NewContext(int(w), int(h))
 	fontSize := 96.0
@@ -86,24 +89,24 @@ func stockMarket2() {
 		bx := 7.8 // 133 / 7.8 => roughly 17
 
 		lpQuantile := 0
-		maxRev := rksYears[cntr].Qs[90]
+		maxRev := rksyrs.Qs[90]
 
 		// log.Print(" ")
 
-		for i := 0; i < len(rksYears[cntr].Rankings); i++ {
+		for i := 0; i < len(rksyrs.RkgsYear[cntr].Rankings); i++ {
 
 			// ten per row
-			if len(rksYears[cntr].Rankings)-i > 100 {
+			if len(rksyrs.RkgsYear[cntr].Rankings)-i > 100 {
 				// equalize number of rankings between 101 and 100
 				continue
 			}
 
-			rv := rksYears[cntr].Rankings[i].Revenue
-			nm := rksYears[cntr].Rankings[i].Name
-			sh := rksYears[cntr].Rankings[i].Short
+			rv := rksyrs.RkgsYear[cntr].Rankings[i].Revenue
+			nm := rksyrs.RkgsYear[cntr].Rankings[i].Name
+			sh := rksyrs.RkgsYear[cntr].Rankings[i].Short
 
 			rowFull := cx+bx >= wOverH
-			newQuantile := rv > rksYears[cntr].Qs[90] && lpQuantile != 90
+			newQuantile := rv > rksyrs.Qs[90] && lpQuantile != 90
 
 			if rowFull {
 				if !newRowOnQuant {
@@ -120,14 +123,14 @@ func stockMarket2() {
 			}
 			if newQuantile {
 
-				sizeUp := rksYears[cntr].Qs[98] / rksYears[cntr].Qs[90] * 0.98
+				sizeUp := rksyrs.Qs[98] / rksyrs.Qs[90] * 0.98
 
 				log.Printf("sizing up the box from %5.1f to %5.1f", bx, bx*sizeUp*1.2)
 
 				bx *= sizeUp
 
 				lpQuantile = 90
-				maxRev = rksYears[cntr].Qs[98]
+				maxRev = rksyrs.Qs[98]
 
 				log.Printf("Yr %v-Quant chg %v", yr, i)
 			}
