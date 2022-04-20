@@ -5,9 +5,19 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math"
 
 	"github.com/fogleman/gg"
 )
+
+func loadFont(c *gg.Context, fontSize float64) {
+	// fontSize := 96.0
+	// fontSize = 12.0
+	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
+		log.Fatalf("Cannot load font: %v", err)
+	}
+
+}
 
 func stockMarket2() {
 
@@ -27,16 +37,12 @@ func stockMarket2() {
 	// all rendering arguments are standardized to
 	//   100 units of canvas height;
 	//   thus, 133.3 is the according max width
-	wOverH := 1024 * 100.0 / 768
+	wOverH := 1024 * 100.0 / 768 // width over height
 
 	years := rksyrs.Years()
 
 	c := gg.NewContext(int(w), int(h))
-	fontSize := 96.0
-	fontSize = 12.0
-	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
-		log.Fatalf("Cannot load font: %v", err)
-	}
+	loadFont(c, 12)
 
 	scale100 := float64(w) / float64(100)
 	if h < w {
@@ -46,7 +52,7 @@ func stockMarket2() {
 	// funcs as closures to reduce number of parameters
 	drwC := func(x, y, boxRad, revenue, mxRv float64) {
 
-		cRad := revenue / mxRv * boxRad // circle rad
+		cRad := revenue / mxRv * boxRad // circle radius
 
 		c.DrawCircle(
 			scale100*x,
@@ -69,75 +75,86 @@ func stockMarket2() {
 		)
 	}
 
-	newRowOnQuant := false
+	contRows := true // continuous rows - even on new quantile
+	// contRows = false
 
 	//
 	//
-	cntr := -1
+	frameCntr := -1
 	for _, yr := range years {
+		frameCntr++
 
-		cntr++
-
-		c.SetRGB(0.1, 0.1, 0.1)
+		// empty existing conext
+		c.SetRGB(0.001, 0.001, 0.001)
 		c.Clear()
 
-		c.SetRGB(0.8, 0.8, 0.8)
-		c.DrawString(fmt.Sprintf("Yr %v", yr), 5, 5+c.FontHeight())
+		cx := 0.0 // distance from left
+		cy := 0.0 // distance from bottom
 
-		cx := 0.0
-		cy := 0.0
-		bx := 7.8 // 133 / 7.8 => roughly 17
+		// initial box size,
+		// 133 / 7.8   => roughly 17
+		bx := 7.8
+		bx = 7.35 // 18
+		bx = 6.63 // 20
 
-		lpQuantile := 0
-		maxRev := rksyrs.Qs[90]
+		lastBox := bx
+
+		boxMargin := 0.1
 
 		// log.Print(" ")
+		quant := rksyrs.Qs.At(50) // current quantile
 
-		for i := 0; i < len(rksyrs.RkgsYear[cntr].Rankings); i++ {
+		for i := 0; i < len(rksyrs.RkgsYear[frameCntr].Rankings); i++ {
 
-			// ten per row
-			if len(rksyrs.RkgsYear[cntr].Rankings)-i > 100 {
-				// equalize number of rankings between 101 and 100
+			if len(rksyrs.RkgsYear[frameCntr].Rankings)-i > 100 {
+				// equalize number of rankings between 101 and 100;
+				// if we start for instance with thirteen per row;
+				// then the biggest circle has the same rank (100, not 101/100/102)
 				continue
 			}
 
-			rv := rksyrs.RkgsYear[cntr].Rankings[i].Revenue
-			nm := rksyrs.RkgsYear[cntr].Rankings[i].Name
-			sh := rksyrs.RkgsYear[cntr].Rankings[i].Short
+			rv := rksyrs.RkgsYear[frameCntr].Rankings[i].Revenue
+			nm := rksyrs.RkgsYear[frameCntr].Rankings[i].Name
+			sh := rksyrs.RkgsYear[frameCntr].Rankings[i].Short
 
-			rowFull := cx+bx >= wOverH
-			newQuantile := rv > rksyrs.Qs[90] && lpQuantile != 90
+			newQuantile := rv > quant.Rev
 
-			if rowFull {
-				if !newRowOnQuant {
-					cx = 0
-					cy += bx // before computing new bx
-				}
-			}
-			if rowFull || newQuantile {
-				if newRowOnQuant {
-					cx = 0
-					cy += bx // before computing new bx
-
-				}
-			}
 			if newQuantile {
-
-				sizeUp := rksyrs.Qs[98] / rksyrs.Qs[90] * 0.98
-
-				log.Printf("sizing up the box from %5.1f to %5.1f", bx, bx*sizeUp*1.2)
-
+				// tentative
+				newQuant := rksyrs.Qs.Next(quant.Q)
+				sizeUp := math.Sqrt(newQuant.Rev / quant.Rev)
+				log.Printf("yr %v - quant%03v to %3v: box sizing from %5.1f to %5.1f", yr, quant.Q, newQuant.Q, bx, bx*sizeUp)
+				lastBox = bx
 				bx *= sizeUp
+				quant = newQuant
+			}
 
-				lpQuantile = 90
-				maxRev = rksyrs.Qs[98]
+			rowOverflow := cx+bx >= wOverH
 
-				log.Printf("Yr %v-Quant chg %v", yr, i)
+			if contRows {
+				if rowOverflow && newQuantile {
+					cx = 0
+					cy += lastBox // before computing new bx
+				}
+				if rowOverflow && !newQuantile {
+					cx = 0
+					cy += bx
+				}
+			} else {
+				if rowOverflow || newQuantile {
+					if newQuantile {
+						cx = 0
+						cy += lastBox // before computing new bx
+					}
+					if !newQuantile {
+						cx = 0
+						cy += bx
+					}
+				}
 			}
 
 			x := cx + bx/2
 			cx += bx
-
 			y := 100 - bx - cy
 
 			// if i%5 == 0 {
@@ -145,12 +162,12 @@ func stockMarket2() {
 			// }
 
 			if true {
-				c.DrawRectangle(scale100*(x-bx/2+0.3), scale100*(y+0.3), scale100*(bx-0.6), scale100*(bx-0.6))
+				c.DrawRectangle(scale100*(x-bx/2+boxMargin), scale100*(y+boxMargin), scale100*(bx-2*boxMargin), scale100*(bx-2*boxMargin))
 				c.SetColor(color.RGBA{32, 32, 32, 80})
 				c.Fill()
 			}
 
-			drwC(x, y, bx/2, rv, maxRev)
+			drwC(x, y, bx/2, rv, quant.Rev)
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
@@ -158,7 +175,14 @@ func stockMarket2() {
 			drwTxt(x, y, bx, sh)
 
 		}
+		//
+		// frame label
+		loadFont(c, 32)
+		c.SetRGB(0.8, 0.8, 0.8)
+		c.DrawString(fmt.Sprintf("Year %v (%v)", yr, frameCntr+1), 5, 5+c.FontHeight())
+		loadFont(c, 12) // reset font
 
+		//
 		// save to PNG
 		if true {
 			fn := fmt.Sprintf("./out/sm2_%02v.png", yr)
@@ -168,10 +192,10 @@ func stockMarket2() {
 		images = append(images, renderIntoPalettedImage(c))
 
 		elongation := 50
-		if cntr < len(years)/2 {
-			delays = append(delays, cntr*elongation)
+		if frameCntr < len(years)/2 {
+			delays = append(delays, frameCntr*elongation)
 		} else {
-			delays = append(delays, (len(years)-cntr)*elongation)
+			delays = append(delays, (len(years)-frameCntr)*elongation)
 		}
 
 		// break
