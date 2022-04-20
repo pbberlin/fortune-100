@@ -188,12 +188,10 @@ func (rksyrs RankingsYears) NamesShort() {
 			}
 			rksyrs.RkgsYear[i].Rankings[j].Short = sh
 
-			if rksyrs.RkgsYear[i].Rankings[j].Name == "Ford Motor" {
-				rksyrs.RkgsYear[i].Rankings[j].Short = "Ford"
+			if shExp, ok := explicitShortNames[rksyrs.RkgsYear[i].Rankings[j].Name]; ok {
+				rksyrs.RkgsYear[i].Rankings[j].Short = shExp
 			}
-			if rksyrs.RkgsYear[i].Rankings[j].Name == "Amazon" {
-				rksyrs.RkgsYear[i].Rankings[j].Short = "AMZ"
-			}
+
 		}
 	}
 }
@@ -386,6 +384,20 @@ var replacements = map[string]string{
 	"AmerisourceBergen":                 "Amerisource Bergen",
 }
 
+var explicitShortNames = map[string]string{
+	"Ford Motor":         "Ford",
+	"Amazon":             "Amazn",
+	"Walmart":            "Walm",
+	"Exxon Mobil":        "Exxon",
+	"Chevron":            "Chevrn",
+	"Citicorp":           "Citi",
+	"PepsiCo":            "Pepsi",
+	"Bank of America":    "BkOfA",
+	"Conoco":             "Conoco",
+	"Apple":              "Apple",
+	"Berkshire Hathaway": "Bksh.H",
+}
+
 func replaceName(s string) string {
 	s = strings.TrimSpace(s)
 	if s1, ok := replacements[s]; ok {
@@ -546,8 +558,21 @@ func organize() {
 		{Q: 75},
 		{Q: 90},
 		{Q: 95},
-		{Q: 97},
+		// {Q: 97},
 		{Q: 98},
+		{Q: 100},
+	}
+
+	rksyrs.Qs = Quantils{
+		{Q: 00},
+		{Q: 20},
+		{Q: 40},
+		{Q: 60},
+		{Q: 80},
+		{Q: 90},
+		{Q: 95},
+		{Q: 97},
+		{Q: 99},
 		{Q: 100},
 	}
 

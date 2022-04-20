@@ -34,6 +34,17 @@ func stockMarket2() {
 	w = 1024
 	h = 768
 
+	// initial box size,
+	// 133 / 7.8   => roughly 17
+	bxBase := 7.8
+	bxBase = 7.35 // 18
+	bxBase = 6.63 // 20
+	bxBase = 6.04 // 22
+	bxBase = 5.54 // 24
+	bxBaseRad := bxBase / 2
+
+	baseQuant := rksyrs.Qs[1]
+
 	// all rendering arguments are standardized to
 	//   100 units of canvas height;
 	//   thus, 133.3 is the according max width
@@ -50,15 +61,22 @@ func stockMarket2() {
 	}
 
 	// funcs as closures to reduce number of parameters
-	drwC := func(x, y, boxRad, revenue, mxRv float64) {
+	drwC := func(
+		x, y, boxRad float64,
+		// bxSizeUp float64,
+		// quantRevPrv float64,
+		// quantRev float64,
+		companyRev float64,
+	) {
 
-		cRad := revenue / mxRv * boxRad // circle radius
-
+		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
+		cRad := zeroToOne * bxBaseRad // circle radius
 		c.DrawCircle(
 			scale100*x,
 			scale100*(y+boxRad),
 			scale100*cRad,
 		)
+
 	}
 	drwTxt := func(x, y, bx float64, s string) {
 		c.SetRGB(0.95, 0.95, 0.95)
@@ -75,11 +93,10 @@ func stockMarket2() {
 		)
 	}
 
+	//
+	//
 	contRows := true // continuous rows - even on new quantile
 	// contRows = false
-
-	//
-	//
 	frameCntr := -1
 	for _, yr := range years {
 		frameCntr++
@@ -91,18 +108,14 @@ func stockMarket2() {
 		cx := 0.0 // distance from left
 		cy := 0.0 // distance from bottom
 
-		// initial box size,
-		// 133 / 7.8   => roughly 17
-		bx := 7.8
-		bx = 7.35 // 18
-		bx = 6.63 // 20
+		bx := bxBase
 
 		lastBox := bx
 
-		boxMargin := 0.1
+		bxMrg := 0.1
 
 		// log.Print(" ")
-		quant := rksyrs.Qs.At(50) // current quantile
+		quant := baseQuant // current quantile
 
 		for i := 0; i < len(rksyrs.RkgsYear[frameCntr].Rankings); i++ {
 
@@ -122,10 +135,12 @@ func stockMarket2() {
 			if newQuantile {
 				// tentative
 				newQuant := rksyrs.Qs.Next(quant.Q)
-				sizeUp := math.Sqrt(newQuant.Rev / quant.Rev)
-				log.Printf("yr %v - quant%03v to %3v: box sizing from %5.1f to %5.1f", yr, quant.Q, newQuant.Q, bx, bx*sizeUp)
+				bxSizeUp := math.Sqrt(newQuant.Rev / quant.Rev)
+				if frameCntr == 0 {
+					log.Printf("yr %v - quant%03v to %3v: box sizing from %5.1f to %5.1f", yr, quant.Q, newQuant.Q, bx, bx*bxSizeUp)
+				}
 				lastBox = bx
-				bx *= sizeUp
+				bx *= bxSizeUp
 				quant = newQuant
 			}
 
@@ -162,12 +177,15 @@ func stockMarket2() {
 			// }
 
 			if true {
-				c.DrawRectangle(scale100*(x-bx/2+boxMargin), scale100*(y+boxMargin), scale100*(bx-2*boxMargin), scale100*(bx-2*boxMargin))
+				c.DrawRectangle(scale100*(x-bx/2+bxMrg), scale100*(y+bxMrg), scale100*(bx-2*bxMrg), scale100*(bx-2*bxMrg))
 				c.SetColor(color.RGBA{32, 32, 32, 80})
 				c.Fill()
 			}
 
-			drwC(x, y, bx/2, rv, quant.Rev)
+			drwC(
+				x, y, bx/2,
+				rv,
+			)
 			// log.Printf("drawing %4v %4v - %v", x, y, cl)
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
@@ -179,7 +197,7 @@ func stockMarket2() {
 		// frame label
 		loadFont(c, 32)
 		c.SetRGB(0.8, 0.8, 0.8)
-		c.DrawString(fmt.Sprintf("Year %v (%v)", yr, frameCntr+1), 5, 5+c.FontHeight())
+		c.DrawString(fmt.Sprintf("#%v - year %v", frameCntr+1, yr), 5, 5+c.FontHeight())
 		loadFont(c, 12) // reset font
 
 		//
