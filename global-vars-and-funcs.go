@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/fogleman/gg"
 )
 
 var circleCols = []color.RGBA{
@@ -321,6 +323,15 @@ func rawList2JSON() {
 	err = os.WriteFile("./out/rankings.json", bts, 0777)
 	if err != nil {
 		log.Fatalf("cannot write file ./out/rankings.json: %v", err)
+	}
+
+}
+
+func loadFont(c *gg.Context, fontSize float64) {
+	// fontSize := 96.0
+	// fontSize = 12.0
+	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
+		log.Fatalf("Cannot load font: %v", err)
 	}
 
 }

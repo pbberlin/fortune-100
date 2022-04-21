@@ -18,6 +18,7 @@ func main() {
 
 	// organize()
 
-	stockMarket2()
+	// animationsNoTransition()
+	animationsTransition()
 
 }

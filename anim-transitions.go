@@ -10,16 +10,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func loadFont(c *gg.Context, fontSize float64) {
-	// fontSize := 96.0
-	// fontSize = 12.0
-	if err := c.LoadFontFace("./out/arial.ttf", fontSize); err != nil {
-		log.Fatalf("Cannot load font: %v", err)
-	}
-
-}
-
-func stockMarket2() {
+func animationsTransition() {
 
 	// fetching data
 	rksyrs := readRankingsYears()
@@ -51,39 +42,46 @@ func stockMarket2() {
 	//   thus, 133.3 is the according max width
 	wOverH := 1024 * 100.0 / 768 // width over height
 
+	// go graphics
+	// 		we use a single context, cleaning it between frames
 	c := gg.NewContext(int(w), int(h))
 	loadFont(c, 12)
 
-	scale100 := float64(w) / float64(100)
+	// The context should be populated in
+	// coordinates from 0...100 and 0...133 - depending on the ratio could be 0...125 or other.
+	// If w and or h are changed, then the program should not be affected.
+	// Now a scale factor (sf) assuming min...max is 0...100;
+	// 		which is applied ot all painting operations immedatialy before painting
+	sf := float64(w) / float64(100)
 	if h < w {
-		scale100 = float64(h) / float64(100) // shorter side dominates
+		sf = float64(h) / float64(100) // shorter side dominates
 	}
 
-	// funcs as closures to reduce number of parameters
+	// funcs as closures
+	// having access to all global parameters above
+	// reducing the number of parameters;
+	// draw circle:
 	drwC := func(
 		x, y, boxRad float64,
-		// bxSizeUp float64,
-		// quantRevPrv float64,
-		// quantRev float64,
 		companyRev float64,
 	) {
-
 		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
 		cRad := zeroToOne * bxBaseRad // circle radius
 		c.DrawCircle(
-			scale100*x,
-			scale100*(y+boxRad),
-			scale100*cRad,
+			sf*x,
+			sf*(y+boxRad),
+			sf*cRad,
 		)
 
 	}
+	// drwTxt draws text centered at x, vertically bottomed, with a width of bx
 	drwTxt := func(x, y, bx float64, s string) {
 		c.SetRGB(0.95, 0.95, 0.95)
-		// c.DrawString(s, scale100*x, scale100*y+c.FontHeight())
+		// c.DrawString        (s, scale100*x, scale100*y+c.FontHeight())
 		// c.DrawStringAnchored(s, scale100*x, scale100*y, 0.5, 0.5)
 		c.DrawStringWrapped(
 			s,
-			scale100*x, scale100*(y+bx),
+			sf*x, sf*(y+bx),
 			// 0.5, 0.5,
 			0.5, 0.99,
 			bx*0.95,
@@ -94,13 +92,12 @@ func stockMarket2() {
 
 	//
 	//
-	contRows := true // continuous rows - even on new quantile
-	// contRows = false
-	frameCntr := -1
+	continuousRows := true // continuous rows - dont start new now on new quantile
+	frameCntr := -1        // number of images
 	for _, yr := range years {
 		frameCntr++
 
-		// empty existing conext
+		// empty existing context from previous frame drawings
 		c.SetRGB(0.001, 0.001, 0.001)
 		c.Clear()
 
@@ -110,8 +107,6 @@ func stockMarket2() {
 		bx := bxBase
 
 		lastBox := bx
-
-		bxMrg := 0.1
 
 		// log.Print(" ")
 		quant := baseQuant // current quantile
@@ -155,7 +150,7 @@ func stockMarket2() {
 
 			rowOverflow := cx+bx >= wOverH
 
-			if contRows {
+			if continuousRows {
 				if rowOverflow && quantileOverflow {
 					cx = 0
 					cy += lastBox // before computing new bx
@@ -181,12 +176,12 @@ func stockMarket2() {
 			cx += bx
 			y := 100 - bx - cy
 
-			// if i%5 == 0 {
 			// 	log.Printf("  cx %3.0f    x %3.0f    row %2.0v    y %3.0f", cx, x, row, y)
-			// }
 
+			// drawing a pale box - to make the box packing easy to spot
 			if true {
-				c.DrawRectangle(scale100*(x-bx/2+bxMrg), scale100*(y+bxMrg), scale100*(bx-2*bxMrg), scale100*(bx-2*bxMrg))
+				bxMrg := 0.1
+				c.DrawRectangle(sf*(x-bx/2+bxMrg), sf*(y+bxMrg), sf*(bx-2*bxMrg), sf*(bx-2*bxMrg))
 				c.SetColor(color.RGBA{32, 32, 32, 80})
 				c.Fill()
 			}
@@ -195,15 +190,16 @@ func stockMarket2() {
 				x, y, bx/2,
 				rv,
 			)
-			// log.Printf("drawing %4v %4v - %v", x, y, cl)
+
+			// painting the company name
 			c.SetColor(companiesByName[nm].Color)
 			c.Fill()
-
 			drwTxt(x, y, bx, sh)
 
 		}
+
 		//
-		// frame label
+		// left top frame label
 		loadFont(c, 32)
 		c.SetRGB(0.8, 0.8, 0.8)
 		c.DrawString(fmt.Sprintf("#%v - year %v", frameCntr+1, yr), 5, 5+c.FontHeight())
@@ -212,12 +208,12 @@ func stockMarket2() {
 		//
 		// save to PNG
 		if true {
-			fn := fmt.Sprintf("./out/sm2_%02v.png", yr)
+			fn := fmt.Sprintf("./out/anim_trans_%02v.png", yr)
 			c.SavePNG(fn)
 		}
 
+		// save to animated GIF structure
 		images = append(images, renderIntoPalettedImage(c))
-
 		elongation := 50
 		if frameCntr < len(years)/2 {
 			delays = append(delays, frameCntr*elongation)
@@ -225,10 +221,8 @@ func stockMarket2() {
 			delays = append(delays, (len(years)-frameCntr)*elongation)
 		}
 
-		// break
-
 	}
 
-	saveAnimGIF(images, delays, "stock-market-2")
+	saveAnimGIF(images, delays, "anim_trans")
 
 }
