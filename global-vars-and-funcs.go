@@ -12,6 +12,36 @@ import (
 	"github.com/fogleman/gg"
 )
 
+var w float64 = 1024
+var h float64 = 768
+
+// initial box size,
+var bxBase = 5.54 // 133 / 7.8   => roughly 17
+// var bxBase = 7.35 // 18
+// var bxBase = 6.63 // 20
+// var bxBase = 6.04 // 22
+
+var bxBaseRad = bxBase / 2
+
+// all rendering arguments are standardized to
+//   100 units of canvas height;
+//   thus, 133.3 is the according max width
+// wOverH := 1024 * 100.0 / 768 // width over height
+var wOverH = w * 100.0 / h // width over height
+
+// The context should be populated in
+// coordinates from 0...100 and 0...133 - depending on the ratio could be 0...125 or other.
+// If w and or h are changed, then the program should not be affected.
+// Now a scale factor (sf) assuming min...max is 0...100;
+// 		which is applied ot all painting operations immedatialy before painting
+func computeSF() float64 {
+	sf := float64(w) / float64(100)
+	if h < w {
+		sf = float64(h) / float64(100) // shorter side dominates
+	}
+	return sf
+}
+
 var circleCols = []color.RGBA{
 	// {0x00, 0x00, 0x00, 0xff}, // not black
 

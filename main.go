@@ -19,6 +19,8 @@ func main() {
 	// organize()
 
 	// animationsNoTransition()
-	animationsTransition()
+
+	animationsTransitionStage1()
+	animationsTransitionStage3()
 
 }

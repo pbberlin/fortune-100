@@ -1,67 +1,59 @@
 package main
 
 import (
-	"fmt"
-	"image"
+	"encoding/json"
 	"image/color"
 	"log"
 	"math"
-
-	"github.com/fogleman/gg"
+	"os"
 )
 
-func animationsNoTransition() {
+// structs for intediary stage
+
+type Item struct {
+	X, Y, Rad float64    // x,y coordinates 0...100 and circle radius
+	Color     color.RGBA // company color
+	Short     string     // name short
+	Box       float64
+}
+
+type MainFrame struct {
+	Year  int
+	Items map[string]Item // company name as key
+}
+
+func animationsTransitionStage1() {
 
 	// fetching data
 	rksyrs := readRankingsYears()
-	rksyrs.QuantilesTotal()
 	companiesByName := readCompaniesByYears()
 	baseQuant := rksyrs.Qs[1] // quantile
 	years := rksyrs.Years()
 
 	//
-	// output structures
-	var images []*image.Paletted
-	var delays []int
+	// intermediara structures
+	mainFrames := []MainFrame{}
 
-	// go graphics
-	// 		we use a single context, cleaning it between frames
-	c := gg.NewContext(int(w), int(h))
-	loadFont(c, 12)
-
-	sf := computeSF()
-
-	// funcs as closures
-	// having access to all global parameters above
-	// reducing the number of parameters;
-	// draw circle:
-	drwC := func(
+	addItem := func(
+		fr *MainFrame,
 		x, y, boxRad float64,
 		companyRev float64,
+		nameLong, nameShort string,
+		col color.RGBA,
+		box float64,
 	) {
 		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
 		cRad := zeroToOne * bxBaseRad // circle radius
-		c.DrawCircle(
-			sf*x,
-			sf*(y+boxRad),
-			sf*cRad,
-		)
+		itm := Item{X: x, Y: (y + boxRad), Rad: cRad, Short: nameShort, Color: col}
 
-	}
-	// drwTxt draws text centered at x, vertically bottomed, with a width of bx
-	drwTxt := func(x, y, bx float64, s string) {
-		c.SetRGB(0.95, 0.95, 0.95)
-		// c.DrawString        (s, scale100*x, scale100*y+c.FontHeight())
-		// c.DrawStringAnchored(s, scale100*x, scale100*y, 0.5, 0.5)
-		c.DrawStringWrapped(
-			s,
-			sf*x, sf*(y+bx),
-			// 0.5, 0.5,
-			0.5, 0.99,
-			bx*0.95,
-			1.3,
-			gg.AlignCenter,
-		)
+		itm.X = math.Round(itm.X*1000) / 1000
+		itm.Y = math.Round(itm.Y*1000) / 1000
+		itm.Rad = math.Round(itm.Rad*1000) / 1000
+
+		itm.Box = box
+
+		fr.Items[nameLong] = itm
+
 	}
 
 	//
@@ -71,15 +63,13 @@ func animationsNoTransition() {
 	for _, yr := range years {
 		frameCntr++
 
-		// empty existing context from previous frame drawings
-		c.SetRGB(0.001, 0.001, 0.001)
-		c.Clear()
+		frame := MainFrame{Year: yr, Items: map[string]Item{}} // init
+		mainFrames = append(mainFrames, frame)
 
 		cx := 0.0 // distance from left
 		cy := 0.0 // distance from bottom
 
 		bx := bxBase
-
 		lastBox := bx
 
 		// log.Print(" ")
@@ -152,51 +142,26 @@ func animationsNoTransition() {
 
 			// 	log.Printf("  cx %3.0f    x %3.0f    row %2.0v    y %3.0f", cx, x, row, y)
 
-			// drawing a pale box - to make the box packing easy to spot
-			if true {
-				bxMrg := 0.1
-				c.DrawRectangle(sf*(x-bx/2+bxMrg), sf*(y+bxMrg), sf*(bx-2*bxMrg), sf*(bx-2*bxMrg))
-				c.SetColor(color.RGBA{32, 32, 32, 80})
-				c.Fill()
-			}
-
-			drwC(
+			addItem(
+				&frame,
 				x, y, bx/2,
 				rv,
+				nm, sh,
+				companiesByName[nm].Color,
+				bx,
 			)
 
-			// painting the company name
-			c.SetColor(companiesByName[nm].Color)
-			c.Fill()
-			drwTxt(x, y, bx, sh)
-
-		}
-
-		//
-		// left top frame label
-		loadFont(c, 32)
-		c.SetRGB(0.8, 0.8, 0.8)
-		c.DrawString(fmt.Sprintf("#%v - year %v", frameCntr+1, yr), 5, 5+c.FontHeight())
-		loadFont(c, 12) // reset font
-
-		//
-		// save to PNG
-		if true {
-			fn := fmt.Sprintf("./out/sm2_%02v.png", yr)
-			c.SavePNG(fn)
-		}
-
-		// save to animated GIF structure
-		images = append(images, renderIntoPalettedImage(c))
-		elongation := 50
-		if frameCntr < len(years)/2 {
-			delays = append(delays, frameCntr*elongation)
-		} else {
-			delays = append(delays, (len(years)-frameCntr)*elongation)
 		}
 
 	}
 
-	saveAnimGIF(images, delays, "stock-market-2")
+	bts1, err := json.MarshalIndent(mainFrames, " ", "  ")
+	if err != nil {
+		log.Fatalf("cannot jsonify mainFrames: %v", err)
+	}
+	err = os.WriteFile("./out/mainFrames.json", bts1, 0777)
+	if err != nil {
+		log.Fatalf("cannot write file ./out/mainFrames.json: %v", err)
+	}
 
 }
