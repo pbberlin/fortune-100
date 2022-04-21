@@ -45,9 +45,23 @@ func animationsTransitionStage3() {
 		bx float64,
 	) {
 
+		// drawing a pale box - to make the box packing easy to spot
+		if true {
+			bxMrg := 0.2
+			bxHalfMrg := bx/2 - bxMrg
+			c.DrawRectangle(
+				sf*(x-bxHalfMrg),
+				sf*(y-bxHalfMrg),
+				sf*(2*bxHalfMrg),
+				sf*(2*bxHalfMrg),
+			)
+			c.SetColor(color.RGBA{32, 32, 32, 80})
+			c.Fill()
+		}
+
 		c.DrawCircle(
 			sf*x,
-			sf*(y+rd),
+			sf*y,
 			sf*rd,
 		)
 		c.SetColor(col)
@@ -56,10 +70,10 @@ func animationsTransitionStage3() {
 		c.SetRGB(0.95, 0.95, 0.95)
 		c.DrawStringWrapped(
 			sh,
-			sf*x, sf*(y+bx),
-			// 0.5, 0.5,
-			0.5, 0.99,
-			bx*0.95,
+			sf*x,
+			sf*(y+bx/2),
+			0.5, 0.99, // ax 0.5, ay 0.5,
+			bx*0.95, // width
 			1.3,
 			gg.AlignCenter,
 		)

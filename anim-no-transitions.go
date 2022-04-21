@@ -79,7 +79,6 @@ func animationsNoTransition() {
 		cy := 0.0 // distance from bottom
 
 		bx := bxBase
-
 		lastBox := bx
 
 		// log.Print(" ")

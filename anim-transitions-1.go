@@ -45,12 +45,14 @@ func animationsTransitionStage1() {
 		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
 		cRad := zeroToOne * bxBaseRad // circle radius
 		itm := Item{X: x, Y: (y + boxRad), Rad: cRad, Short: nameShort, Color: col}
-
-		itm.X = math.Round(itm.X*1000) / 1000
-		itm.Y = math.Round(itm.Y*1000) / 1000
-		itm.Rad = math.Round(itm.Rad*1000) / 1000
+		// itm := Item{X: x, Y: (y), Rad: cRad, Short: nameShort, Color: col}
 
 		itm.Box = box
+
+		// itm.X = math.Round(itm.X*1000) / 1000
+		// itm.Y = math.Round(itm.Y*1000) / 1000
+		// itm.Rad = math.Round(itm.Rad*1000) / 1000
+		// itm.Box = math.Round(itm.Box*1000) / 1000
 
 		fr.Items[nameLong] = itm
 
