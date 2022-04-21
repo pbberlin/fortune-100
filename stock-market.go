@@ -21,12 +21,15 @@ func loadFont(c *gg.Context, fontSize float64) {
 
 func stockMarket2() {
 
+	// fetching data
 	rksyrs := readRankingsYears()
-
 	rksyrs.QuantilesTotal()
-
 	companiesByName := readCompaniesByYears()
+	baseQuant := rksyrs.Qs[1] // quantile
+	years := rksyrs.Years()
 
+	//
+	// output structures
 	var images []*image.Paletted
 	var delays []int
 
@@ -43,14 +46,10 @@ func stockMarket2() {
 	bxBase = 5.54 // 24
 	bxBaseRad := bxBase / 2
 
-	baseQuant := rksyrs.Qs[1]
-
 	// all rendering arguments are standardized to
 	//   100 units of canvas height;
 	//   thus, 133.3 is the according max width
 	wOverH := 1024 * 100.0 / 768 // width over height
-
-	years := rksyrs.Years()
 
 	c := gg.NewContext(int(w), int(h))
 	loadFont(c, 12)
@@ -130,13 +129,23 @@ func stockMarket2() {
 			nm := rksyrs.RkgsYear[frameCntr].Rankings[i].Name
 			sh := rksyrs.RkgsYear[frameCntr].Rankings[i].Short
 
-			newQuantile := rv > quant.Rev
-
-			if newQuantile {
-				// tentative
-				newQuant := rksyrs.Qs.Next(quant.Q)
+			quantileOverflow := rv > quant.Rev
+			if quantileOverflow {
+				newQuant := quant
+				for i := 0; ; i++ {
+					newQuant = rksyrs.Qs.Next(newQuant.Q)
+					if i > 0 {
+						log.Printf("yr %v - jumping %v quantiles: comp %5v, rank %3v RV %5.0f - quant rev %5.0f",
+							yr, i+1, sh, rksyrs.RkgsYear[frameCntr].Rankings[i].Rank, rv, newQuant.Rev,
+						)
+					}
+					// quantile overflow - end
+					if rv < newQuant.Rev || newQuant.Q == 100 {
+						break
+					}
+				}
 				bxSizeUp := math.Sqrt(newQuant.Rev / quant.Rev)
-				if frameCntr == 0 {
+				if frameCntr == 0 || frameCntr == len(years)-1 {
 					log.Printf("yr %v - quant%03v to %3v: box sizing from %5.1f to %5.1f", yr, quant.Q, newQuant.Q, bx, bx*bxSizeUp)
 				}
 				lastBox = bx
@@ -147,21 +156,21 @@ func stockMarket2() {
 			rowOverflow := cx+bx >= wOverH
 
 			if contRows {
-				if rowOverflow && newQuantile {
+				if rowOverflow && quantileOverflow {
 					cx = 0
 					cy += lastBox // before computing new bx
 				}
-				if rowOverflow && !newQuantile {
+				if rowOverflow && !quantileOverflow {
 					cx = 0
 					cy += bx
 				}
 			} else {
-				if rowOverflow || newQuantile {
-					if newQuantile {
+				if rowOverflow || quantileOverflow {
+					if quantileOverflow {
 						cx = 0
 						cy += lastBox // before computing new bx
 					}
-					if !newQuantile {
+					if !quantileOverflow {
 						cx = 0
 						cy += bx
 					}

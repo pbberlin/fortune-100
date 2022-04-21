@@ -1,4 +1,4 @@
-module github.com/pbberlin/stock-market
+module github.com/pbberlin/fortune-100
 
 go 1.18
 
