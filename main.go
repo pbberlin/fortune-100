@@ -21,6 +21,7 @@ func main() {
 	// animationsNoTransition()
 
 	animationsTransitionStage1()
+	computeTransitions()
 	animationsTransitionStage3()
 
 }

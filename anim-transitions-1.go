@@ -1,26 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"image/color"
 	"log"
 	"math"
-	"os"
 )
-
-// structs for intediary stage
-
-type Item struct {
-	X, Y, Rad float64    // x,y coordinates 0...100 and circle radius
-	Color     color.RGBA // company color
-	Short     string     // name short
-	Box       float64
-}
-
-type MainFrame struct {
-	Year  int
-	Items map[string]Item // company name as key
-}
 
 func animationsTransitionStage1() {
 
@@ -32,7 +16,7 @@ func animationsTransitionStage1() {
 
 	//
 	// intermediara structures
-	mainFrames := []MainFrame{}
+	mainFrames := MainFrames{}
 
 	addItem := func(
 		fr *MainFrame,
@@ -44,15 +28,23 @@ func animationsTransitionStage1() {
 	) {
 		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
 		cRad := zeroToOne * bxBaseRad // circle radius
-		itm := Item{X: x, Y: (y + boxRad), Rad: cRad, Short: nameShort, Color: col}
+		itm := Item{
+			ItemCore: ItemCore{
+				X:     x,
+				Y:     (y + boxRad),
+				Rad:   cRad,
+				Box:   box,
+				Long:  nameLong,
+				Short: nameShort,
+				Color: col,
+			},
+		}
 		// itm := Item{X: x, Y: (y), Rad: cRad, Short: nameShort, Color: col}
 
-		itm.Box = box
-
-		// itm.X = math.Round(itm.X*1000) / 1000
-		// itm.Y = math.Round(itm.Y*1000) / 1000
-		// itm.Rad = math.Round(itm.Rad*1000) / 1000
-		// itm.Box = math.Round(itm.Box*1000) / 1000
+		itm.X = math.Round(itm.X*1000) / 1000
+		itm.Y = math.Round(itm.Y*1000) / 1000
+		itm.Rad = math.Round(itm.Rad*1000) / 1000
+		itm.Box = math.Round(itm.Box*1000) / 1000
 
 		fr.Items[nameLong] = itm
 
@@ -157,13 +149,6 @@ func animationsTransitionStage1() {
 
 	}
 
-	bts1, err := json.MarshalIndent(mainFrames, " ", "  ")
-	if err != nil {
-		log.Fatalf("cannot jsonify mainFrames: %v", err)
-	}
-	err = os.WriteFile("./out/mainFrames.json", bts1, 0777)
-	if err != nil {
-		log.Fatalf("cannot write file ./out/mainFrames.json: %v", err)
-	}
+	mainFrames.Save("mainFrames1.json")
 
 }

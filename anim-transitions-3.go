@@ -1,29 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
-	"log"
-	"os"
 
 	"github.com/fogleman/gg"
 )
 
 func animationsTransitionStage3() {
 
-	// fetching data
-	bts, err := os.ReadFile("./out/mainFrames.json")
-	if err != nil {
-		log.Fatalf("cannot read file ./out/mainFrames.json: %v", err)
-	}
-
-	mainFrames := []MainFrame{}
-	err = json.Unmarshal(bts, &mainFrames)
-	if err != nil {
-		log.Fatalf("cannot unmarshal ./out/mainFrames.json: %v", err)
-	}
+	mainFrames := Load("mainFrames2.json")
 
 	//
 	// output structures
@@ -133,14 +120,5 @@ func animationsTransitionStage3() {
 	}
 
 	saveAnimGIF(images, delays, "anim_trans")
-
-	bts3, err := json.MarshalIndent(mainFrames, " ", "  ")
-	if err != nil {
-		log.Fatalf("cannot jsonify mainFrames: %v", err)
-	}
-	err = os.WriteFile("./out/mainFrames.json", bts3, 0777)
-	if err != nil {
-		log.Fatalf("cannot write file ./out/mainFrames.json: %v", err)
-	}
 
 }
