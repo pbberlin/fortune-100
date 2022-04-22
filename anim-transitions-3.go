@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 
 	"github.com/fogleman/gg"
 )
@@ -134,7 +135,7 @@ func animationsTransitionStage3() {
 			// save to PNG
 			subset := mainFrameCntr == 0 || mainFrameCntr == len(mainFrames)-2 || mainFrameCntr == len(mainFrames)-3
 			if subset || subFrameCntr == 0 {
-				fn := fmt.Sprintf("./out/anim_trans_%02v_%02v.png", yr, subFrameCntr)
+				fn := fmt.Sprintf("./out/png/anim_trans_%02v_%02v.png", yr, subFrameCntr)
 				c.SavePNG(fn)
 			}
 
@@ -142,15 +143,17 @@ func animationsTransitionStage3() {
 			images = append(images, renderIntoPalettedImage(c))
 			elongation := 4
 			if subFrameCntr == 0 {
-				elongation = 750
+				elongation = 550
 				if mainFrameCntr == 0 {
-					elongation = 2000
+					elongation = 1100
 				}
 				if mainFrameCntr == len(mainFrames)-1 {
 					elongation = 22250
 				}
 			}
 			delays = append(delays, elongation)
+
+			log.Printf("mainfr,subfr %02v-%02v", mainFrameCntr, subFrameCntr)
 
 		}
 

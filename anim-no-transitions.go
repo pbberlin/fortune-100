@@ -181,7 +181,7 @@ func animationsNoTransition() {
 		//
 		// save to PNG
 		if true {
-			fn := fmt.Sprintf("./out/sm2_%02v.png", yr)
+			fn := fmt.Sprintf("./out/png-no-transition/sm2_%02v.png", yr)
 			c.SavePNG(fn)
 		}
 
