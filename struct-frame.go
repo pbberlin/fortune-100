@@ -13,8 +13,10 @@ import (
 type ItemCore struct {
 	X, Y, Rad   float64 // x,y coordinates 0...100 and circle radius
 	Box         float64
+	Long, Short string // name long, short; long is also the map key
+	Rank        int
+	Revenue     float64
 	Color       color.RGBA // company color
-	Long, Short string     // name long, short; long is also the map key
 }
 
 type Item struct {

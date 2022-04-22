@@ -21,10 +21,11 @@ func animationsTransitionStage1() {
 	addItem := func(
 		fr *MainFrame,
 		x, y, boxRad float64,
-		companyRev float64,
-		nameLong, nameShort string,
-		col color.RGBA,
 		box float64,
+		nameLong, nameShort string,
+		companyRev float64,
+		rank int,
+		col color.RGBA,
 	) {
 		zeroToOne := math.Sqrt(companyRev / baseQuant.Rev)
 		cRad := zeroToOne * bxBaseRad // circle radius
@@ -36,6 +37,7 @@ func animationsTransitionStage1() {
 				Box:   box,
 				Long:  nameLong,
 				Short: nameShort,
+				Rank:  rank,
 				Color: col,
 			},
 		}
@@ -139,10 +141,11 @@ func animationsTransitionStage1() {
 			addItem(
 				&frame,
 				x, y, bx/2,
-				rv,
-				nm, sh,
-				companiesByName[nm].Color,
 				bx,
+				nm, sh,
+				rv,
+				rksyrs.RkgsYear[frameCntr].Rankings[i].Rank,
+				companiesByName[nm].Color,
 			)
 
 		}

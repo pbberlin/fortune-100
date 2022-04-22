@@ -197,6 +197,7 @@ var replacements = map[string]string{
 	"May Department Stores":             "May Dept Stores",
 	"SBC Communications":                "SBC Comm",
 	"AmerisourceBergen":                 "Amerisource Bergen",
+	"Exxon Mobil":                       "Exxon",
 }
 
 var explicitShortNames = map[string]string{
@@ -364,4 +365,12 @@ func loadFont(c *gg.Context, fontSize float64) {
 		log.Fatalf("Cannot load font: %v", err)
 	}
 
+}
+
+func pale(col color.RGBA, paling float64) color.RGBA {
+	col.R = uint8(float64(col.R) * paling)
+	col.G = uint8(float64(col.G) * paling)
+	col.B = uint8(float64(col.B) * paling)
+	ret := col
+	return ret
 }
